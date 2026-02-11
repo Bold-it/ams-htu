@@ -1,0 +1,297 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Ho Technical University - Accreditation Monitoring System */
+
+@layer base {
+  :root {
+    /* Core HTU palette - Royal Blue with red accent */
+    --background: 210 20% 98%;
+    --foreground: 215 30% 12%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 215 30% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 30% 12%;
+
+    /* Primary - HTU Royal Blue */
+    --primary: 210 100% 35%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary - Light blue from logo gear */
+    --secondary: 200 60% 94%;
+    --secondary-foreground: 210 100% 30%;
+
+    --muted: 210 20% 96%;
+    --muted-foreground: 210 15% 45%;
+
+    /* Accent - HTU Red/Flame accent */
+    --accent: 0 85% 50%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 210 25% 88%;
+    --input: 210 25% 88%;
+    --ring: 210 100% 35%;
+
+    --radius: 0.625rem;
+
+    /* Status colors - Semantic */
+    --status-active: 152 60% 42%;
+    --status-active-bg: 152 60% 95%;
+    --status-active-border: 152 50% 75%;
+
+    --status-warning: 38 92% 50%;
+    --status-warning-bg: 38 100% 96%;
+    --status-warning-border: 38 80% 70%;
+
+    --status-critical: 0 72% 51%;
+    --status-critical-bg: 0 100% 97%;
+    --status-critical-border: 0 60% 75%;
+
+    --status-expired: 0 0% 35%;
+    --status-expired-bg: 0 0% 95%;
+    --status-expired-border: 0 0% 70%;
+
+    /* Chart colors */
+    --chart-active: 152 60% 42%;
+    --chart-warning: 38 92% 50%;
+    --chart-critical: 0 72% 51%;
+    --chart-expired: 0 0% 45%;
+
+    /* Gradients - HTU Blue */
+    --gradient-header: linear-gradient(135deg, hsl(210 100% 30%), hsl(210 80% 40%));
+    --gradient-card-active: linear-gradient(135deg, hsl(152 60% 95%), hsl(152 50% 98%));
+    --gradient-card-warning: linear-gradient(135deg, hsl(38 100% 96%), hsl(38 80% 98%));
+    --gradient-card-critical: linear-gradient(135deg, hsl(0 100% 97%), hsl(0 80% 99%));
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px 0 hsl(210 30% 15% / 0.05);
+    --shadow-md: 0 4px 6px -1px hsl(210 30% 15% / 0.1), 0 2px 4px -2px hsl(210 30% 15% / 0.1);
+    --shadow-lg: 0 10px 15px -3px hsl(210 30% 15% / 0.1), 0 4px 6px -4px hsl(210 30% 15% / 0.1);
+    --shadow-card: 0 1px 3px 0 hsl(210 30% 15% / 0.08), 0 1px 2px -1px hsl(210 30% 15% / 0.08);
+
+    /* Sidebar - HTU Blue */
+    --sidebar-background: 210 100% 25%;
+    --sidebar-foreground: 210 20% 95%;
+    --sidebar-primary: 0 85% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 80% 35%;
+    --sidebar-accent-foreground: 210 20% 95%;
+    --sidebar-border: 210 80% 35%;
+    --sidebar-ring: 0 85% 55%;
+  }
+
+  .dark {
+    --background: 215 30% 8%;
+    --foreground: 210 20% 95%;
+
+    --card: 215 25% 12%;
+    --card-foreground: 210 20% 95%;
+
+    --popover: 215 25% 12%;
+    --popover-foreground: 210 20% 95%;
+
+    --primary: 180 45% 55%;
+    --primary-foreground: 215 30% 8%;
+
+    --secondary: 215 25% 18%;
+    --secondary-foreground: 210 20% 90%;
+
+    --muted: 215 25% 18%;
+    --muted-foreground: 215 15% 60%;
+
+    --accent: 180 45% 45%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 62% 45%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 215 25% 22%;
+    --input: 215 25% 22%;
+    --ring: 180 45% 55%;
+
+    --status-active: 152 55% 50%;
+    --status-active-bg: 152 40% 15%;
+    --status-active-border: 152 40% 30%;
+
+    --status-warning: 38 85% 55%;
+    --status-warning-bg: 38 50% 12%;
+    --status-warning-border: 38 50% 30%;
+
+    --status-critical: 0 65% 55%;
+    --status-critical-bg: 0 50% 12%;
+    --status-critical-border: 0 50% 30%;
+
+    --status-expired: 0 0% 55%;
+    --status-expired-bg: 0 0% 15%;
+    --status-expired-border: 0 0% 35%;
+
+    --chart-active: 152 55% 50%;
+    --chart-warning: 38 85% 55%;
+    --chart-critical: 0 65% 55%;
+    --chart-expired: 0 0% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold tracking-tight;
+  }
+}
+
+@layer components {
+  /* Metric card variants */
+  .metric-card {
+    @apply relative overflow-hidden rounded-xl border bg-card p-6 transition-all duration-200;
+    box-shadow: var(--shadow-card);
+  }
+
+  .metric-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+  }
+
+  .metric-card-active {
+    border-color: hsl(var(--status-active-border));
+    background: var(--gradient-card-active);
+  }
+
+  .metric-card-warning {
+    border-color: hsl(var(--status-warning-border));
+    background: var(--gradient-card-warning);
+  }
+
+  .metric-card-critical {
+    border-color: hsl(var(--status-critical-border));
+    background: var(--gradient-card-critical);
+  }
+
+  /* Status badge styles */
+  .status-badge {
+    @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide;
+  }
+
+  .status-badge-active {
+    background-color: hsl(var(--status-active-bg));
+    color: hsl(var(--status-active));
+    border: 1px solid hsl(var(--status-active-border));
+  }
+
+  .status-badge-warning {
+    background-color: hsl(var(--status-warning-bg));
+    color: hsl(var(--status-warning));
+    border: 1px solid hsl(var(--status-warning-border));
+  }
+
+  .status-badge-critical {
+    background-color: hsl(var(--status-critical-bg));
+    color: hsl(var(--status-critical));
+    border: 1px solid hsl(var(--status-critical-border));
+  }
+
+  .status-badge-expired {
+    background-color: hsl(var(--status-expired-bg));
+    color: hsl(var(--status-expired));
+    border: 1px solid hsl(var(--status-expired-border));
+  }
+
+  /* Alert banner */
+  .alert-banner-critical {
+    @apply flex items-center gap-3 rounded-lg border px-4 py-3;
+    background-color: hsl(var(--status-critical-bg));
+    border-color: hsl(var(--status-critical-border));
+    color: hsl(var(--status-critical));
+  }
+
+  /* Table row hover */
+  .table-row-interactive {
+    @apply cursor-pointer transition-colors;
+  }
+
+  .table-row-interactive:hover {
+    @apply bg-muted/50;
+  }
+
+  /* Upload zone */
+  .upload-zone {
+    @apply relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-8 transition-all duration-200;
+    border-color: hsl(var(--border));
+  }
+
+  .upload-zone:hover,
+  .upload-zone-active {
+    border-color: hsl(var(--accent));
+    background-color: hsl(var(--accent) / 0.05);
+  }
+
+  /* Progress bar */
+  .progress-timeline {
+    @apply h-2 rounded-full overflow-hidden;
+    background-color: hsl(var(--muted));
+  }
+
+  .progress-timeline-fill {
+    @apply h-full rounded-full transition-all duration-500;
+  }
+
+  .progress-active {
+    background-color: hsl(var(--status-active));
+  }
+
+  .progress-warning {
+    background-color: hsl(var(--status-warning));
+  }
+
+  .progress-critical {
+    background-color: hsl(var(--status-critical));
+  }
+
+  .progress-expired {
+    background-color: hsl(var(--status-expired));
+  }
+
+  /* Header gradient */
+  .header-gradient {
+    background: var(--gradient-header);
+  }
+}
+
+/* Custom scrollbar */
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--border));
+    border-radius: 3px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--muted-foreground));
+  }
+}
