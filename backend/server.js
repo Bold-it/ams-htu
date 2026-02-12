@@ -15,8 +15,37 @@ const pool = mysql.createPool({
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0,
 });
+
+// Auto-create database and table on startup
+async function initializeDatabase() {
+    try {
+        const connection = await pool.getConnection();
+        // Create database if it doesn't exist
+        await connection.query(`CREATE DATABASE IF NOT EXISTS ${process.env.DB_NAME}`);
+        await connection.query(`USE ${process.env.DB_NAME}`);
+        // Create table if it doesn't exist
+        await connection.query(`
+            CREATE TABLE IF NOT EXISTS accreditations (
+                id VARCHAR(36) PRIMARY KEY,
+                programme_name VARCHAR(255) NOT NULL,
+                start_date DATE,
+                expiry_date DATE NOT NULL,
+                email VARCHAR(255)
+            )
+        `);
+        connection.release();
+        console.log(`✓ Database ${process.env.DB_NAME} and table ready`);
+    } catch (err) {
+        console.error('Database initialization error:', err);
+    }
+}
+
+// Initialize database on startup
+initializeDatabase();
 
 function getStatus(expiryDate) {
     const days = Math.floor((new Date(expiryDate) - new Date()) / 86400000);
