@@ -62,9 +62,9 @@ export function useAddAccreditation() {
       if (error) throw new Error(error);
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: accreditationKeys.all });
-      toast.success('Accreditation added successfully');
+      toast.success(`Added "${variables.programme_name}" - Expires: ${variables.expiry_date}`);
     },
     onError: (error: Error) => toast.error(`Failed to add: ${error.message}`),
   });
