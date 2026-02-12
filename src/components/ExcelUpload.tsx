@@ -144,9 +144,19 @@ export function ExcelUpload({ onDataLoaded }: ExcelUploadProps) {
               <li>• Accreditation Start Date (optional)</li>
               <li>• Responsible Email Address (optional)</li>
             </ul>
+            <div className="mt-3 pt-2 border-t border-border/50">
+              <a
+                href="/sample_accreditation_data.xlsx"
+                download
+                className="text-xs text-primary hover:underline flex items-center gap-1"
+              >
+                <FileSpreadsheet className="h-3 w-3" />
+                Download sample template
+              </a>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
     </>
   );
-}
+} 
