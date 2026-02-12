@@ -89,6 +89,24 @@ const Index = () => {
     setEmailModalOpen(true);
   };
 
+  const handleDelete = async (accreditation: Accreditation) => {
+    const confirmDelete = window.confirm(
+      `Are you sure you want to delete "${accreditation.programmeName}"? This action cannot be undone.`
+    );
+
+    if (!confirmDelete) return;
+
+    const { error } = await api.deleteAccreditation(accreditation.id);
+
+    if (error) {
+      toast.error(`Failed to delete accreditation: ${error}`);
+    } else {
+      toast.success(`Deleted "${accreditation.programmeName}"`);
+      setDetailModalOpen(false);
+      queryClient.invalidateQueries({ queryKey: accreditationKeys.all });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -174,6 +192,7 @@ const Index = () => {
         isOpen={detailModalOpen}
         onClose={() => setDetailModalOpen(false)}
         onSendReminder={handleSendReminder}
+        onDelete={handleDelete}
       />
       <EmailPreviewModal
         accreditations={emailRecipients}

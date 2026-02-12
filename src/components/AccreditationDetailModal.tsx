@@ -1,4 +1,4 @@
-import { X, Calendar, Clock, Mail, AlertTriangle, CheckCircle } from "lucide-react";
+import { X, Calendar, Clock, Mail, AlertTriangle, CheckCircle, Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -20,6 +20,7 @@ interface AccreditationDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSendReminder: (accreditation: Accreditation) => void;
+  onDelete: (accreditation: Accreditation) => void;
 }
 
 export function AccreditationDetailModal({
@@ -27,6 +28,7 @@ export function AccreditationDetailModal({
   isOpen,
   onClose,
   onSendReminder,
+  onDelete,
 }: AccreditationDetailModalProps) {
   if (!accreditation) return null;
 
@@ -177,52 +179,49 @@ export function AccreditationDetailModal({
 
           {/* Status Alert */}
           <div
-            className={`rounded-lg border p-4 ${
-              status === "expired" || status === "critical"
-                ? "border-status-critical bg-status-critical-bg"
-                : status === "warning"
+            className={`rounded-lg border p-4 ${status === "expired" || status === "critical"
+              ? "border-status-critical bg-status-critical-bg"
+              : status === "warning"
                 ? "border-status-warning bg-status-warning-bg"
                 : "border-status-active bg-status-active-bg"
-            }`}
+              }`}
           >
             <div className="flex items-start gap-3">
               {status === "active" ? (
                 <CheckCircle className="mt-0.5 h-5 w-5 text-status-active" />
               ) : (
                 <AlertTriangle
-                  className={`mt-0.5 h-5 w-5 ${
-                    status === "expired" || status === "critical"
-                      ? "text-status-critical"
-                      : "text-status-warning"
-                  }`}
+                  className={`mt-0.5 h-5 w-5 ${status === "expired" || status === "critical"
+                    ? "text-status-critical"
+                    : "text-status-warning"
+                    }`}
                 />
               )}
               <div className="flex-1">
                 <h4
-                  className={`font-semibold ${
-                    status === "expired" || status === "critical"
-                      ? "text-status-critical"
-                      : status === "warning"
+                  className={`font-semibold ${status === "expired" || status === "critical"
+                    ? "text-status-critical"
+                    : status === "warning"
                       ? "text-status-warning"
                       : "text-status-active"
-                  }`}
+                    }`}
                 >
                   {status === "active"
                     ? "Compliant"
                     : status === "warning"
-                    ? "Renewal Planning Required"
-                    : status === "critical"
-                    ? "Urgent Action Required"
-                    : "Accreditation Expired"}
+                      ? "Renewal Planning Required"
+                      : status === "critical"
+                        ? "Urgent Action Required"
+                        : "Accreditation Expired"}
                 </h4>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {status === "active"
                     ? "This programme is fully accredited with more than 12 months remaining."
                     : status === "warning"
-                    ? "Begin the renewal process to ensure continuity of accreditation."
-                    : status === "critical"
-                    ? "Less than 6 months remaining. Expedite the renewal process immediately."
-                    : "The accreditation has lapsed. Contact the accrediting body for reinstatement."}
+                      ? "Begin the renewal process to ensure continuity of accreditation."
+                      : status === "critical"
+                        ? "Less than 6 months remaining. Expedite the renewal process immediately."
+                        : "The accreditation has lapsed. Contact the accrediting body for reinstatement."}
                 </p>
               </div>
             </div>
@@ -242,22 +241,32 @@ export function AccreditationDetailModal({
           </div>
 
           {/* Actions */}
-          <div className="flex gap-3 pt-2">
-            <Button variant="outline" onClick={onClose} className="flex-1">
-              Close
+          <div className="flex flex-col gap-3 pt-2">
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={onClose} className="flex-1">
+                Close
+              </Button>
+              {(status === "warning" ||
+                status === "critical" ||
+                status === "expired") &&
+                email && (
+                  <Button
+                    onClick={() => onSendReminder(accreditation)}
+                    className="flex-1 gap-2 bg-accent hover:bg-accent/90"
+                  >
+                    <Mail className="h-4 w-4" />
+                    Send Reminder
+                  </Button>
+                )}
+            </div>
+            <Button
+              variant="destructive"
+              onClick={() => onDelete(accreditation)}
+              className="w-full gap-2"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete Accreditation
             </Button>
-            {(status === "warning" ||
-              status === "critical" ||
-              status === "expired") &&
-              email && (
-                <Button
-                  onClick={() => onSendReminder(accreditation)}
-                  className="flex-1 gap-2 bg-accent hover:bg-accent/90"
-                >
-                  <Mail className="h-4 w-4" />
-                  Send Reminder
-                </Button>
-              )}
           </div>
         </div>
       </DialogContent>
