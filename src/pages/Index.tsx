@@ -13,7 +13,7 @@ import { ComplianceChart } from "@/components/ComplianceChart";
 import { ExpiryTimeline } from "@/components/ExpiryTimeline";
 import { AccreditationTable } from "@/components/AccreditationTable";
 import { AccreditationDetailModal } from "@/components/AccreditationDetailModal";
-// import { ExcelUpload } from "@/components/ExcelUpload";
+import { ExcelUpload } from "@/components/ExcelUpload";
 import { AddAccreditationDialog } from "@/components/AddAccreditationDialog";
 import { EmailPreviewModal } from "@/components/EmailPreviewModal";
 import { BulkEmailActions } from "@/components/BulkEmailActions";
@@ -44,24 +44,25 @@ const Index = () => {
   );
 
   // Handle Excel upload → insert into DB
-  // const handleDataLoaded = async (data: Accreditation[]) => {
-  //   let successCount = 0;
-  //   for (const a of data) {
-  //     const { error } = await api.addAccreditation({
-  //       programme_name: a.programmeName,
-  //       start_date: a.startDate || '',
-  //       expiry_date: a.expiryDate,
-  //       email: a.email || '',
-  //     });
-  //     if (!error) successCount++;
-  //   }
-  //   if (successCount > 0) {
-  //     toast.success(`Imported ${successCount} accreditations`);
-  //     queryClient.invalidateQueries({ queryKey: accreditationKeys.all });
-  //   } else {
-  //     toast.error("Failed to import accreditations");
-  //   }
-  // };
+  // Handle Excel upload → insert into DB
+  const handleDataLoaded = async (data: Accreditation[]) => {
+    let successCount = 0;
+    for (const a of data) {
+      const { error } = await api.addAccreditation({
+        programme_name: a.programmeName,
+        start_date: a.startDate || '',
+        expiry_date: a.expiryDate,
+        email: a.email || '',
+      });
+      if (!error) successCount++;
+    }
+    if (successCount > 0) {
+      toast.success(`Imported ${successCount} accreditations`);
+      queryClient.invalidateQueries({ queryKey: accreditationKeys.all });
+    } else {
+      toast.error("Failed to import accreditations");
+    }
+  };
 
   const handleRowClick = (accreditation: Accreditation) => {
     setSelectedAccreditation(accreditation);
@@ -100,7 +101,7 @@ const Index = () => {
             <h2 className="text-lg font-semibold">Dashboard Overview</h2>
           </div>
           <div className="flex items-center gap-2">
-            {/* <ExcelUpload onDataLoaded={handleDataLoaded} /> */}
+            <ExcelUpload onDataLoaded={handleDataLoaded} />
             <AddAccreditationDialog />
           </div>
         </div>
