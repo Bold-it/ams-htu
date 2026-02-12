@@ -1,3 +1,4 @@
+const cron = require('node-cron');
 const express = require('express');
 const cors = require('cors');
 const mysql = require('mysql2/promise');
@@ -153,6 +154,42 @@ app.get('/api/health', async (req, res) => {
         res.json({ status: 'ok', smtp: process.env.RESEND_API_KEY ? 'configured' : 'not configured', accreditations: rows[0].count });
     } catch (err) {
         res.status(500).json({ status: 'error', error: err.message });
+    }
+});
+
+// Automatic Email Reminders
+// Runs every day at 9:00 AM
+cron.schedule('0 9 * * *', async () => {
+    console.log('Running daily accreditation check...');
+    try {
+        if (!resend) {
+            console.log('Email service not configured. Skipping automated checks.');
+            return;
+        }
+
+        const [rows] = await pool.query('SELECT * FROM accreditations WHERE email IS NOT NULL');
+        // Target intervals: 1 day, 1 week, 2 weeks, 1 month (30 days), 6 months (180 days), 1 year (365 days)
+        const targetDays = [1, 7, 14, 30, 180, 365];
+
+        for (const row of rows) {
+            const { days } = getStatus(row.expiry_date);
+
+            if (targetDays.includes(days)) {
+                console.log(`Sending auto-reminder for ${row.programme_name} (Expires in ${days} days)`);
+                try {
+                    await resend.emails.send({
+                        from: 'HTU QA Unit <onboarding@resend.dev>',
+                        to: [row.email],
+                        subject: `Action Required: Accreditation Expiring in ${days} Days - ${row.programme_name}`,
+                        html: `<p>The accreditation for <strong>${row.programme_name}</strong> expires in <strong>${days} days</strong>.</p><p>Please take necessary action to renew the accreditation.</p>`,
+                    });
+                } catch (emailErr) {
+                    console.error(`Failed to send email for ${row.programme_name}:`, emailErr);
+                }
+            }
+        }
+    } catch (err) {
+        console.error('Error in daily accreditation check:', err);
     }
 });
 
