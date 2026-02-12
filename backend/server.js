@@ -67,6 +67,35 @@ app.post('/api/accreditations', async (req, res) => {
             [id, programme_name, start_date || null, expiry_date, email || null]
         );
         const [rows] = await pool.query('SELECT * FROM accreditations WHERE id = ?', [id]);
+
+        // Send welcome email if email is provided
+        if (email && resend) {
+            try {
+                const { days } = getStatus(expiry_date);
+                await resend.emails.send({
+                    from: 'HTU QA Unit <onboarding@resend.dev>',
+                    to: [email],
+                    subject: `Accreditation Registered: ${programme_name}`,
+                    html: `
+                        <h2>Welcome to HTU Accreditation Monitoring System</h2>
+                        <p>Your programme has been successfully registered in our accreditation monitoring system.</p>
+                        <h3>Programme Details:</h3>
+                        <ul>
+                            <li><strong>Programme:</strong> ${programme_name}</li>
+                            <li><strong>Expiry Date:</strong> ${expiry_date}</li>
+                            <li><strong>Days Until Expiry:</strong> ${days} days</li>
+                        </ul>
+                        <p>You will receive automatic reminder emails at key intervals: 1 year, 6 months, 1 month, 2 weeks, 1 week, and 1 day before expiry.</p>
+                        <p><em>Quality Assurance Unit - Ho Technical University</em></p>
+                    `,
+                });
+                console.log(`Welcome email sent to ${email} for ${programme_name}`);
+            } catch (emailErr) {
+                console.error(`Failed to send welcome email:`, emailErr);
+                // Don't fail the request if email fails
+            }
+        }
+
         res.status(201).json(transformRow(rows[0]));
     } catch (err) {
         res.status(500).json({ error: err.message });
