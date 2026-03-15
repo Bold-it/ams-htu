@@ -5,6 +5,8 @@ export type AccreditationStatus = "active" | "warning" | "critical" | "expired";
 export interface Accreditation {
   id: string;
   programmeName: string;
+  faculty: string;
+  department: string;
   startDate: string;
   expiryDate: string;
   email: string;
@@ -86,7 +88,7 @@ export function calculateDaysUntilExpiry(expiryDate: string): number {
 // Determine status based on days until expiry
 export function getStatus(daysUntilExpiry: number): AccreditationStatus {
   if (daysUntilExpiry <= 0) return "expired";
-  if (daysUntilExpiry <= 180) return "critical"; // 6 months
+  if (daysUntilExpiry <= 90) return "critical"; // 3 months
   if (daysUntilExpiry <= 365) return "warning"; // 12 months
   return "active";
 }
@@ -136,6 +138,17 @@ const columnMappings = {
     "Email Address",
     "Contact",
   ],
+  faculty: [
+    "Faculty",
+    "School",
+    "Faculty/School",
+    "Academic Unit",
+  ],
+  department: [
+    "Department",
+    "Department Name",
+    "Section",
+  ],
 };
 
 // Find matching column name
@@ -160,6 +173,8 @@ export function processAccreditationData(rawData: any[]): Accreditation[] {
   const startCol = findColumnName(firstRow, columnMappings.startDate);
   const expiryCol = findColumnName(firstRow, columnMappings.expiryDate);
   const emailCol = findColumnName(firstRow, columnMappings.email);
+  const facultyCol = findColumnName(firstRow, columnMappings.faculty);
+  const departmentCol = findColumnName(firstRow, columnMappings.department);
 
   if (!programmeCol || !expiryCol) {
     console.error("Required columns not found. Found columns:", Object.keys(firstRow));
@@ -180,6 +195,9 @@ export function processAccreditationData(rawData: any[]): Accreditation[] {
       const expiryDate = parseExcelDate(expiryDateRaw);
       const startDate = startDateRaw ? parseExcelDate(startDateRaw) : "";
 
+      const faculty = facultyCol ? row[facultyCol]?.toString()?.trim() || "" : "";
+      const department = departmentCol ? row[departmentCol]?.toString()?.trim() || "" : "";
+
       if (!expiryDate) return null;
 
       const daysUntilExpiry = calculateDaysUntilExpiry(expiryDate);
@@ -188,6 +206,8 @@ export function processAccreditationData(rawData: any[]): Accreditation[] {
       return {
         id: `acc-${index + 1}`,
         programmeName,
+        faculty,
+        department,
         startDate,
         expiryDate,
         email,
@@ -326,6 +346,8 @@ export const sampleAccreditations: Accreditation[] = [
   {
     id: "acc-1",
     programmeName: "BSc Computer Science",
+    faculty: "Faculty of Applied Sciences",
+    department: "Computer Science",
     startDate: "2021-09-01",
     expiryDate: "2025-08-31",
     email: "cs.dept@university.edu",
@@ -335,6 +357,8 @@ export const sampleAccreditations: Accreditation[] = [
   {
     id: "acc-2",
     programmeName: "BSc Electrical Engineering",
+    faculty: "Faculty of Engineering",
+    department: "Electrical Engineering",
     startDate: "2022-01-15",
     expiryDate: "2025-05-15",
     email: "ee.dept@university.edu",
@@ -344,6 +368,8 @@ export const sampleAccreditations: Accreditation[] = [
   {
     id: "acc-3",
     programmeName: "HND Accountancy",
+    faculty: "Faculty of Business",
+    department: "Accountancy",
     startDate: "2022-06-01",
     expiryDate: "2026-06-30",
     email: "accountancy@university.edu",
@@ -353,6 +379,8 @@ export const sampleAccreditations: Accreditation[] = [
   {
     id: "acc-4",
     programmeName: "BSc Mechanical Engineering",
+    faculty: "Faculty of Engineering",
+    department: "Mechanical Engineering",
     startDate: "2020-09-01",
     expiryDate: "2025-02-28",
     email: "mech.eng@university.edu",
@@ -362,6 +390,8 @@ export const sampleAccreditations: Accreditation[] = [
   {
     id: "acc-5",
     programmeName: "MBA Business Administration",
+    faculty: "Faculty of Business",
+    department: "Business Administration",
     startDate: "2023-01-15",
     expiryDate: "2028-01-14",
     email: "business@university.edu",
@@ -371,6 +401,8 @@ export const sampleAccreditations: Accreditation[] = [
   {
     id: "acc-6",
     programmeName: "BSc Nursing",
+    faculty: "Faculty of Applied Health Sciences",
+    department: "Nursing",
     startDate: "2021-03-01",
     expiryDate: "2024-12-31",
     email: "nursing@university.edu",
@@ -380,6 +412,8 @@ export const sampleAccreditations: Accreditation[] = [
   {
     id: "acc-7",
     programmeName: "HND Civil Engineering",
+    faculty: "Faculty of Engineering",
+    department: "Civil Engineering",
     startDate: "2022-09-01",
     expiryDate: "2027-08-31",
     email: "civil.eng@university.edu",
@@ -389,6 +423,8 @@ export const sampleAccreditations: Accreditation[] = [
   {
     id: "acc-8",
     programmeName: "BSc Pharmacy",
+    faculty: "Faculty of Applied Health Sciences",
+    department: "Pharmacy",
     startDate: "2020-06-01",
     expiryDate: "2025-07-15",
     email: "pharmacy@university.edu",

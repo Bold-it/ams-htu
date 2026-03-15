@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { Upload, FileSpreadsheet, X, AlertCircle } from "lucide-react";
+import { Upload, FileSpreadsheet, X, AlertCircle, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -20,6 +20,7 @@ export function ExcelUpload({ onDataLoaded }: ExcelUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
 
   const processFile = useCallback(
     async (file: File) => {
@@ -47,6 +48,7 @@ export function ExcelUpload({ onDataLoaded }: ExcelUploadProps) {
 
         onDataLoaded(accreditations);
         setIsOpen(false);
+        setPendingFile(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to process file");
       } finally {
@@ -63,23 +65,39 @@ export function ExcelUpload({ onDataLoaded }: ExcelUploadProps) {
 
       const file = e.dataTransfer.files[0];
       if (file && (file.name.endsWith(".xlsx") || file.name.endsWith(".xls"))) {
-        processFile(file);
+        setPendingFile(file);
+        setError(null);
       } else {
         setError("Please upload an Excel file (.xlsx or .xls)");
       }
     },
-    [processFile]
+    []
   );
 
   const handleFileSelect = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (file) {
-        processFile(file);
+        setPendingFile(file);
+        setError(null);
       }
     },
-    [processFile]
+    []
   );
+
+  const handleConfirm = () => {
+    if (pendingFile) {
+      processFile(pendingFile);
+    }
+  };
+
+  const handleClose = (open: boolean) => {
+    setIsOpen(open);
+    if (!open) {
+      setPendingFile(null);
+      setError(null);
+    }
+  };
 
   return (
     <>
@@ -92,42 +110,61 @@ export function ExcelUpload({ onDataLoaded }: ExcelUploadProps) {
         <span className="sm:hidden">Upload</span>
       </Button>
 
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <Dialog open={isOpen} onOpenChange={handleClose}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Upload Accreditation Data</DialogTitle>
             <DialogDescription>
-              Upload an Excel file containing your programme accreditation data.
+              {pendingFile
+                ? "Confim that you want to upload this file. This will update your system records."
+                : "Upload an Excel file containing your programme accreditation data."}
             </DialogDescription>
           </DialogHeader>
 
-          <div
-            className={`upload-zone ${isDragging ? "upload-zone-active" : ""}`}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setIsDragging(true);
-            }}
-            onDragLeave={() => setIsDragging(false)}
-            onDrop={handleDrop}
-          >
-            <FileSpreadsheet className="mb-3 h-12 w-12 text-muted-foreground" />
-            <p className="mb-2 text-sm font-medium">
-              Drag and drop your Excel file here
-            </p>
-            <p className="mb-4 text-xs text-muted-foreground">
-              or click to browse
-            </p>
-            <input
-              type="file"
-              accept=".xlsx,.xls"
-              onChange={handleFileSelect}
-              className="absolute inset-0 cursor-pointer opacity-0"
-              disabled={isLoading}
-            />
-            <Button variant="outline" size="sm" disabled={isLoading}>
-              {isLoading ? "Processing..." : "Select File"}
-            </Button>
-          </div>
+          {!pendingFile ? (
+            <div
+              className={`upload-zone ${isDragging ? "upload-zone-active" : ""}`}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setIsDragging(true);
+              }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={handleDrop}
+            >
+              <FileSpreadsheet className="mb-3 h-12 w-12 text-muted-foreground" />
+              <p className="mb-2 text-sm font-medium">
+                Drag and drop your Excel file here
+              </p>
+              <p className="mb-4 text-xs text-muted-foreground">
+                or click to browse
+              </p>
+              <input
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={handleFileSelect}
+                className="absolute inset-0 cursor-pointer opacity-0"
+              />
+              <Button variant="outline" size="sm">
+                Select File
+              </Button>
+            </div>
+          ) : (
+            <div className="rounded-lg border-2 border-dashed border-primary/30 p-6 text-center bg-primary/5">
+              <FileSpreadsheet className="mx-auto mb-3 h-12 w-12 text-primary" />
+              <p className="text-sm font-semibold text-primary">{pendingFile.name}</p>
+              <p className="text-xs text-muted-foreground mt-1">{(pendingFile.size / 1024).toFixed(1)} KB</p>
+
+              <div className="flex gap-2 mt-6 justify-center">
+                <Button variant="outline" size="sm" onClick={() => setPendingFile(null)} disabled={isLoading}>
+                  Change File
+                </Button>
+                <Button size="sm" onClick={handleConfirm} disabled={isLoading} className="gap-2">
+                  <Upload className="h-4 w-4" />
+                  {isLoading ? "Processing..." : "Confirm Upload"}
+                </Button>
+              </div>
+            </div>
+          )}
 
           {error && (
             <div className="flex items-start gap-2 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
@@ -136,27 +173,30 @@ export function ExcelUpload({ onDataLoaded }: ExcelUploadProps) {
             </div>
           )}
 
-          <div className="rounded-lg bg-muted/50 p-3">
-            <p className="mb-2 text-xs font-medium">Expected columns:</p>
-            <ul className="space-y-1 text-xs text-muted-foreground">
+          <div className="rounded-lg bg-muted/50 p-4">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Expected columns:</p>
+              <a
+                href="/sample_accreditation_data.xlsx"
+                download
+                className="flex items-center gap-1.5 text-xs font-medium text-accent hover:text-accent/80 transition-colors"
+              >
+                <Download className="h-3 w-3" />
+                Download Sample Template
+              </a>
+            </div>
+            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground">
               <li>• Programme Name (required)</li>
+              <li>• Faculty / School (optional)</li>
+              <li>• Department (optional)</li>
               <li>• Accreditation Expiry Date (required)</li>
               <li>• Accreditation Start Date (optional)</li>
               <li>• Responsible Email Address (optional)</li>
             </ul>
-            <div className="mt-3 pt-2 border-t border-border/50">
-              <a
-                href="/sample_accreditation_data.xlsx"
-                download
-                className="text-xs text-primary hover:underline flex items-center gap-1"
-              >
-                <FileSpreadsheet className="h-3 w-3" />
-                Download sample template
-              </a>
-            </div>
           </div>
         </DialogContent>
       </Dialog>
     </>
   );
-} 
+}
+

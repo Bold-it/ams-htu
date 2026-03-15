@@ -37,6 +37,7 @@ interface AccreditationTableProps {
   onSelectionChange: (ids: Set<string>) => void;
   onRowClick: (accreditation: Accreditation) => void;
   onSendReminder: (accreditation: Accreditation) => void;
+  isAdmin?: boolean;
 }
 
 type SortField = "name" | "days";
@@ -56,6 +57,7 @@ export function AccreditationTable({
   onSelectionChange,
   onRowClick,
   onSendReminder,
+  isAdmin = false,
 }: AccreditationTableProps) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<AccreditationStatus | "all">("all");
@@ -71,7 +73,9 @@ export function AccreditationTable({
       result = result.filter(
         (a) =>
           a.programmeName.toLowerCase().includes(searchLower) ||
-          a.email.toLowerCase().includes(searchLower)
+          a.email.toLowerCase().includes(searchLower) ||
+          a.faculty.toLowerCase().includes(searchLower) ||
+          a.department.toLowerCase().includes(searchLower)
       );
     }
 
@@ -169,16 +173,18 @@ export function AccreditationTable({
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
-              <TableHead className="w-12">
-                <Checkbox
-                  checked={
-                    filteredAndSorted.length > 0 &&
-                    selectedIds.size === filteredAndSorted.length
-                  }
-                  onCheckedChange={toggleAll}
-                  aria-label="Select all"
-                />
-              </TableHead>
+              {isAdmin && (
+                <TableHead className="w-12">
+                  <Checkbox
+                    checked={
+                      filteredAndSorted.length > 0 &&
+                      selectedIds.size === filteredAndSorted.length
+                    }
+                    onCheckedChange={toggleAll}
+                    aria-label="Select all"
+                  />
+                </TableHead>
+              )}
               <TableHead>
                 <button
                   onClick={() => toggleSort("name")}
@@ -188,6 +194,8 @@ export function AccreditationTable({
                   <ArrowUpDown className="h-3.5 w-3.5" />
                 </button>
               </TableHead>
+              <TableHead className="hidden lg:table-cell">Faculty / School</TableHead>
+              <TableHead className="hidden xl:table-cell">Department</TableHead>
               <TableHead className="hidden md:table-cell">Start Date</TableHead>
               <TableHead>Expiry Date</TableHead>
               <TableHead>
@@ -207,7 +215,7 @@ export function AccreditationTable({
           <TableBody>
             {filteredAndSorted.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="h-32 text-center">
+                <TableCell colSpan={10} className="h-32 text-center">
                   <p className="text-sm text-muted-foreground">
                     No programmes found
                   </p>
@@ -229,15 +237,23 @@ export function AccreditationTable({
                     onRowClick(accreditation);
                   }}
                 >
-                  <TableCell>
-                    <Checkbox
-                      checked={selectedIds.has(accreditation.id)}
-                      onCheckedChange={() => toggleOne(accreditation.id)}
-                      aria-label={`Select ${accreditation.programmeName}`}
-                    />
-                  </TableCell>
+                  {isAdmin && (
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedIds.has(accreditation.id)}
+                        onCheckedChange={() => toggleOne(accreditation.id)}
+                        aria-label={`Select ${accreditation.programmeName}`}
+                      />
+                    </TableCell>
+                  )}
                   <TableCell className="font-medium">
                     {accreditation.programmeName}
+                  </TableCell>
+                  <TableCell className="hidden text-muted-foreground lg:table-cell">
+                    {accreditation.faculty || "—"}
+                  </TableCell>
+                  <TableCell className="hidden text-muted-foreground xl:table-cell">
+                    {accreditation.department || "—"}
                   </TableCell>
                   <TableCell className="hidden text-muted-foreground md:table-cell">
                     {formatDisplayDate(accreditation.startDate)}
@@ -255,7 +271,7 @@ export function AccreditationTable({
                     {accreditation.email || "—"}
                   </TableCell>
                   <TableCell>
-                    {(accreditation.status === "warning" ||
+                    {isAdmin && (accreditation.status === "warning" ||
                       accreditation.status === "critical" ||
                       accreditation.status === "expired") &&
                       accreditation.email && (

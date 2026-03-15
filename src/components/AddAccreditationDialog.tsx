@@ -17,6 +17,8 @@ export function AddAccreditationDialog() {
   const [isOpen, setIsOpen] = useState(false);
   const [form, setForm] = useState({
     programme_name: "",
+    faculty: "",
+    department: "",
     start_date: "",
     expiry_date: "",
     email: "",
@@ -29,7 +31,14 @@ export function AddAccreditationDialog() {
     if (!form.programme_name || !form.expiry_date) return;
 
     await addMutation.mutateAsync(form);
-    setForm({ programme_name: "", start_date: "", expiry_date: "", email: "" });
+    setForm({
+      programme_name: "",
+      faculty: "",
+      department: "",
+      start_date: "",
+      expiry_date: "",
+      email: "",
+    });
     setIsOpen(false);
   };
 
@@ -60,6 +69,27 @@ export function AddAccreditationDialog() {
                 placeholder="e.g. BSc Computer Science"
                 required
               />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="faculty">Faculty / School</Label>
+                <Input
+                  id="faculty"
+                  value={form.faculty}
+                  onChange={(e) => setForm((f) => ({ ...f, faculty: e.target.value }))}
+                  placeholder="e.g. Faculty of Applied Sciences"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="department">Department</Label>
+                <Input
+                  id="department"
+                  value={form.department}
+                  onChange={(e) => setForm((f) => ({ ...f, department: e.target.value }))}
+                  placeholder="e.g. Computer Science"
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -105,7 +135,7 @@ export function AddAccreditationDialog() {
             </DialogFooter>
           </form>
         </DialogContent>
-      </Dialog>
+      </Dialog >
     </>
   );
 }

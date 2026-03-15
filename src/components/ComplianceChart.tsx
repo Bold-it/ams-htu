@@ -1,12 +1,9 @@
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
+  PieChart,
+  Pie,
   Tooltip,
   ResponsiveContainer,
   Cell,
-  Legend,
 } from "recharts";
 import { DashboardMetrics } from "@/lib/accreditation-data";
 
@@ -51,28 +48,24 @@ export function ComplianceChart({ metrics }: ComplianceChartProps) {
         </div>
       </div>
 
-      <div className="h-[220px]">
+      <div className="h-[240px]">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-            <XAxis
-              dataKey="name"
-              tick={{ fontSize: 12, fill: "hsl(215, 15%, 45%)" }}
-              axisLine={false}
-              tickLine={false}
-            />
-            <YAxis
-              tick={{ fontSize: 12, fill: "hsl(215, 15%, 45%)" }}
-              axisLine={false}
-              tickLine={false}
-              allowDecimals={false}
-            />
-            <Tooltip content={<CustomTooltip />} cursor={{ fill: "hsl(210, 15%, 96%)" }} />
-            <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={50}>
+          <PieChart>
+            <Pie
+              data={data}
+              cx="50%"
+              cy="50%"
+              innerRadius={60}
+              outerRadius={80}
+              paddingAngle={5}
+              dataKey="value"
+            >
               {data.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={entry.fill} />
               ))}
-            </Bar>
-          </BarChart>
+            </Pie>
+            <Tooltip content={<CustomTooltip />} />
+          </PieChart>
         </ResponsiveContainer>
       </div>
 

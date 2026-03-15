@@ -27,7 +27,7 @@ export function AlertBanner({ metrics }: AlertBannerProps) {
         <p className="mt-0.5 text-xs opacity-80">
           {expired > 0
             ? "Immediate action required. Contact the accrediting body for reinstatement options."
-            : "These programmes will expire within 6 months. Begin renewal process immediately."}
+            : "These programmes will expire within 3 months. Begin renewal process immediately."}
         </p>
       </div>
     </div>

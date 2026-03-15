@@ -6,7 +6,7 @@ interface MetricCardProps {
   value: number;
   subtitle?: string;
   icon: LucideIcon;
-  variant?: "default" | "active" | "warning" | "critical";
+  variant?: "default" | "active" | "warning" | "critical" | "expired";
 }
 
 export function MetricCard({
@@ -21,6 +21,7 @@ export function MetricCard({
     active: "metric-card metric-card-active",
     warning: "metric-card metric-card-warning",
     critical: "metric-card metric-card-critical",
+    expired: "metric-card metric-card-expired",
   };
 
   const iconColors = {
@@ -28,6 +29,7 @@ export function MetricCard({
     active: "text-status-active",
     warning: "text-status-warning",
     critical: "text-status-critical",
+    expired: "text-status-expired",
   };
 
   return (
@@ -46,7 +48,8 @@ export function MetricCard({
             variant === "default" && "bg-primary/10",
             variant === "active" && "bg-status-active/10",
             variant === "warning" && "bg-status-warning/10",
-            variant === "critical" && "bg-status-critical/10"
+            variant === "critical" && "bg-status-critical/10",
+            variant === "expired" && "bg-status-expired/10"
           )}
         >
           <Icon className={cn("h-5 w-5", iconColors[variant])} />

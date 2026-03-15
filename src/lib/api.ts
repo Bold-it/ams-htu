@@ -30,14 +30,15 @@ export interface BulkSendResult {
   results: Array<{ id: string; success: boolean; error?: string }>;
 }
 
-// Transform API response to match frontend Accreditation type
 function transformAccreditation(apiAcc: any): Accreditation {
   const daysUntilExpiry = apiAcc.daysUntilExpiry ?? calculateDaysUntilExpiry(apiAcc.expiryDate);
   const status = apiAcc.status ?? getStatus(daysUntilExpiry);
-  
+
   return {
     id: apiAcc.id,
     programmeName: apiAcc.programmeName,
+    faculty: apiAcc.faculty || '',
+    department: apiAcc.department || '',
     startDate: apiAcc.startDate || '',
     expiryDate: apiAcc.expiryDate,
     email: apiAcc.email || '',
@@ -52,9 +53,11 @@ async function fetchApi<T>(
   options?: RequestInit
 ): Promise<ApiResponse<T>> {
   try {
+    const email = localStorage.getItem('auth_email');
     const response = await fetch(`${API_BASE}${endpoint}`, {
       headers: {
         'Content-Type': 'application/json',
+        'X-User-Email': email || 'anonymous',
       },
       ...options,
     });
@@ -111,11 +114,11 @@ export const api = {
       critical: number;
       expired: number;
     }>('/metrics');
-    
+
     if (response.error || !response.data) {
       return { data: null, error: response.error };
     }
-    
+
     const { total, active } = response.data;
     return {
       data: {
@@ -144,6 +147,8 @@ export const api = {
   // Add a new accreditation
   async addAccreditation(acc: {
     programme_name: string;
+    faculty?: string;
+    department?: string;
     start_date: string;
     expiry_date: string;
     email: string;
@@ -161,11 +166,128 @@ export const api = {
     });
   },
 
+  // Update an accreditation
+  async updateAccreditation(id: string, acc: {
+    programme_name: string;
+    faculty?: string;
+    department?: string;
+    start_date: string;
+    expiry_date: string;
+    email: string;
+  }): Promise<ApiResponse<any>> {
+    return fetchApi(`/accreditations/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(acc),
+    });
+  },
+
+  // Login
+  async login(email: string, password: string): Promise<ApiResponse<{ role: 'super_admin' | 'admin' | 'user'; token: string }>> {
+    return fetchApi('/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    });
+  },
+
+  // Google Login
+  async googleLogin(credential: string): Promise<ApiResponse<{ role?: 'super_admin' | 'admin' | 'user'; token?: string; status?: string; message?: string; email?: string }>> {
+    return fetchApi('/google-login', {
+
+      method: 'POST',
+      body: JSON.stringify({ credential }),
+    });
+  },
+
+
+  // Change Password
+  async changePassword(currentPassword: string, newPassword: string, role: string, targetUsername?: string): Promise<ApiResponse<{ success: boolean; message: string }>> {
+    return fetchApi('/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ currentPassword, newPassword, role, targetUsername }),
+    });
+  },
+
+  // Forgot Password
+  async forgotPassword(email: string): Promise<ApiResponse<{ success: boolean; message: string }>> {
+    return fetchApi('/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  },
+
+  // Reset Password
+  async resetPassword(token: string, newPassword: string): Promise<ApiResponse<{ success: boolean; message: string }>> {
+    return fetchApi('/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ token, newPassword }),
+    });
+  },
+
+  // Send Monthly Report
+  async sendMonthlyReport(): Promise<ApiResponse<{ success: boolean; message: string }>> {
+    return fetchApi('/send-monthly-report', {
+      method: 'POST',
+    });
+  },
+
+  // Get Monthly Report Preview
+  async getMonthlyReportPreview(): Promise<ApiResponse<{ html: string }>> {
+    return fetchApi('/monthly-report-preview');
+  },
+
+  // Health check
+
+
   // Health check
   async healthCheck(): Promise<ApiResponse<HealthStatus>> {
     return fetchApi('/health');
   },
+
+  // Audit Logs
+  async getAuditLogs(): Promise<ApiResponse<any[]>> {
+    return fetchApi('/audit-logs');
+  },
+
+  async getAuditAnalytics(): Promise<ApiResponse<{
+    totalActionsToday: number;
+    mostActiveAdmin: string;
+    lastCriticalAction: any | null;
+  }>> {
+    return fetchApi('/audit-analytics');
+  },
+
+  // User Management
+  async getUsers(): Promise<ApiResponse<any[]>> {
+    return fetchApi('/users');
+  },
+
+  async createUser(userData: any): Promise<ApiResponse<{ success: boolean; message: string }>> {
+    return fetchApi('/users', {
+      method: 'POST',
+      body: JSON.stringify(userData),
+    });
+  },
+
+  async deleteUser(userId: string): Promise<ApiResponse<{ success: boolean; message: string }>> {
+    return fetchApi(`/users/${userId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async resetUserPassword(userId: string): Promise<ApiResponse<{ success: boolean; message: string }>> {
+    return fetchApi('/users/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ userId }),
+    });
+  },
+
+  async approveUser(userId: string): Promise<ApiResponse<{ success: boolean; message: string }>> {
+    return fetchApi(`/users/${userId}/approve`, {
+      method: 'POST',
+    });
+  },
 };
+
 
 // Calculate metrics from accreditation array (for local mode)
 export { calculateMetrics };

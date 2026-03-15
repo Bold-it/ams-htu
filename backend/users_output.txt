@@ -1,0 +1,5 @@
+USER: Bold01 | EMAIL: 0322080364@htu.edu.gh | ROLE: admin
+USER: super_admin | EMAIL: accreditationsystem@htu.edu.gh | ROLE: super_admin
+USER: test-user | EMAIL: 0322080321@htu.edu.gh | ROLE: user
+USER: user | EMAIL: user@htu.edu.gh | ROLE: user
+USER: admin | EMAIL: admin@htu.edu.gh | ROLE: admin

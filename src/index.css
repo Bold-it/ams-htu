@@ -180,6 +180,11 @@
     background: var(--gradient-card-critical);
   }
 
+  .metric-card-expired {
+    border-color: hsl(var(--status-expired-border));
+    background: var(--status-expired-bg);
+  }
+
   /* Status badge styles */
   .status-badge {
     @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide;
