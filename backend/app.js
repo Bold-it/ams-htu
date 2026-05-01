@@ -20,7 +20,24 @@ require('dotenv').config({ path: path.join(__dirname, '.env') });
 console.log('Environment loaded from:', path.join(__dirname, '.env'));
 
 const app = express();
-app.set('trust proxy', 1); // CRITICAL for performance behind cPanel proxy
+app.set('trust proxy', 1);
+
+// --- EXTREME DEBUG SECTION ---
+let lastServerError = "No errors recorded yet.";
+app.get(['/debug', '/api/debug'], (req, res) => {
+    res.setHeader('Content-Type', 'text/plain');
+    res.send(`--- HTU DIAGNOSTIC PAGE ---
+Time: ${new Date().toISOString()}
+__dirname: ${__dirname}
+Env Check:
+DB_HOST: ${process.env.DB_HOST}
+DB_NAME: ${process.env.DB_NAME}
+GOOGLE_CLIENT_ID: ${process.env.GOOGLE_CLIENT_ID ? 'LOADED' : 'MISSING'}
+NODE_VERSION: ${process.version}
+
+Last Server Error:
+${lastServerError}`);
+});
 
 const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
@@ -91,32 +108,6 @@ app.use((req, res, next) => {
     next();
 });
 
-// Global variable for debugging
-let lastServerError = "No errors recorded yet.";
-
-app.get('/api/debug', (req, res) => {
-    res.setHeader('Content-Type', 'text/plain');
-    const distPath = path.join(__dirname, 'dist');
-    const distExists = fs.existsSync(distPath);
-    const indexExists = fs.existsSync(path.join(distPath, 'index.html'));
-    
-    res.send(`--- HTU DIAGNOSTIC PAGE ---
-Time: ${new Date().toISOString()}
-__dirname: ${__dirname}
-dist path: ${distPath}
-dist folder exists: ${distExists}
-index.html exists: ${indexExists}
-
-Last Server Error:
-${lastServerError}
-
-Env Check:
-DB_HOST: ${process.env.DB_HOST}
-DB_NAME: ${process.env.DB_NAME}
-GOOGLE_CLIENT_ID: ${process.env.GOOGLE_CLIENT_ID ? 'LOADED' : 'MISSING'}
-PORT: ${process.env.PORT}
-NODE_VERSION: ${process.version}`);
-});
 
 
 
