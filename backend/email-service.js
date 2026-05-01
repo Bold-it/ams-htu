@@ -46,7 +46,7 @@ const getTransporter = async () => {
         }
     } else {
         // STANDARD SMTP (cPanel / Native HTU Email)
-        const host = (process.env.EMAIL_HOST || "mail.ams.edu.gh").trim();
+        const host = (process.env.EMAIL_HOST || "mail.ams.htu.edu.gh").trim();
         const user = (process.env.EMAIL_USER || "").trim();
         const pass = (process.env.EMAIL_PASS || "").trim();
         const port = parseInt(process.env.EMAIL_PORT) || 465;
@@ -60,7 +60,7 @@ const getTransporter = async () => {
             secure,
             auth: { user, pass },
             tls: { rejectUnauthorized: false },
-            name: 'ams.edu.gh' // Forces the HELO name to resolve correctly
+            name: 'ams.htu.edu.gh' // Forces the HELO name to resolve correctly
         });
 
         try {

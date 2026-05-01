@@ -46,7 +46,7 @@ const forgotPasswordLimiter = rateLimit({
 });
 
 
-const allowedOrigins = [process.env.FRONTEND_URL, 'https://ams.edu.gh', 'http://localhost:8080'].filter(Boolean);
+const allowedOrigins = [process.env.FRONTEND_URL, 'https://ams.htu.edu.gh', 'http://localhost:8080'].filter(Boolean);
 app.use(cors({
     origin: (origin, callback) => {
         if (!origin || allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
