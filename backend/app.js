@@ -707,10 +707,16 @@ app.post('/api/reset-password', async (req, res) => {
 });
 
 app.post('/api/google-login', async (req, res) => {
+    console.log('--- Google Login Attempt ---');
     try {
         const { credential } = req.body;
-        if (!credential) return res.status(400).json({ error: 'Google credential is required' });
+        if (!credential) {
+            console.log('Error: Missing credential in request body');
+            return res.status(400).json({ error: 'Google credential is required' });
+        }
 
+        console.log('Verifying token with Google Client ID:', (process.env.GOOGLE_CLIENT_ID || 'MISSING').substring(0, 10) + '...');
+        
         const ticket = await client.verifyIdToken({
             idToken: credential,
             audience: (process.env.GOOGLE_CLIENT_ID || '').trim(),
@@ -718,19 +724,22 @@ app.post('/api/google-login', async (req, res) => {
 
         const payload = ticket.getPayload();
         const { email, sub: googleId, name } = payload;
+        console.log('Verified email:', email);
 
         // Restriction: Only allow @htu.edu.gh domain
         if (!email.endsWith('@htu.edu.gh')) {
+            console.log('Error: Domain restriction failed for', email);
             return res.status(403).json({ error: 'Only @htu.edu.gh email addresses are allowed.' });
         }
 
         // Check if user exists
+        console.log('Checking database for user...');
         let [rows] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
         let user;
 
         if (rows.length === 0) {
+            console.log('User not found. Creating new account...');
             // New user - create with pending_approval status
-            // Use fallback for older Node versions if crypto.randomUUID is not available
             const userId = (crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex'));
             user = {
                 id: userId,
@@ -745,6 +754,7 @@ app.post('/api/google-login', async (req, res) => {
                 'INSERT INTO users (id, username, email, role, google_id, status) VALUES (?, ?, ?, ?, ?, ?)',
                 [user.id, user.username, user.email, user.role, user.google_id, user.status]
             );
+            console.log('New account created:', user.id);
 
             return res.json({
                 status: 'pending_approval',
