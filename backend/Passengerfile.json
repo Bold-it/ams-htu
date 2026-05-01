@@ -1,0 +1,7 @@
+{
+  "startup_file": "app.js",
+  "port": 3001,
+  "environment": "production",
+  "max_pool_size": 2,
+  "min_instances": 1
+}
