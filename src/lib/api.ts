@@ -1,7 +1,33 @@
-import { Accreditation, DashboardMetrics, calculateMetrics, getStatus, calculateDaysUntilExpiry } from './accreditation-data';
+import { 
+  Accreditation, 
+  DashboardMetrics, 
+  calculateMetrics, 
+  getStatus, 
+  calculateDaysUntilExpiry, 
+  AccreditationDocument, 
+  AccreditationCheckpoint,
+  AccreditationStatus,
+  AccreditationType,
+  WorkflowStatus,
+  UserAccount,
+  AuditLog
+} from './accreditation-data';
 
 // API base URL - defaults to localhost for development
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+const getApiBase = (): string => {
+  let url = import.meta.env.VITE_API_URL || '';
+  
+  if (!url && typeof window !== 'undefined' && !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1')) {
+    url = `${window.location.origin}/api`;
+  }
+  
+  if (!url) url = 'http://localhost:3001/api';
+
+  // Ensure it doesn't end with a slash to prevent double-slash with endpoints
+  return url.endsWith('/') ? url.slice(0, -1) : url;
+};
+
+const API_BASE = getApiBase();
 
 // Check if API mode is enabled
 export const isApiMode = (): boolean => {
@@ -30,20 +56,30 @@ export interface BulkSendResult {
   results: Array<{ id: string; success: boolean; error?: string }>;
 }
 
-function transformAccreditation(apiAcc: any): Accreditation {
-  const daysUntilExpiry = apiAcc.daysUntilExpiry ?? calculateDaysUntilExpiry(apiAcc.expiryDate);
-  const status = apiAcc.status ?? getStatus(daysUntilExpiry);
+// Helper to transform API date strings and potential nulls
+// Helper to transform API date strings and potential nulls
+function transformAccreditation(apiAcc: Record<string, unknown>): Accreditation {
+  const daysUntilExpiry = (apiAcc.daysUntilExpiry as number) ?? calculateDaysUntilExpiry(apiAcc.expiryDate as string);
+  const status = (apiAcc.status as AccreditationStatus) ?? getStatus(daysUntilExpiry);
 
   return {
-    id: apiAcc.id,
-    programmeName: apiAcc.programmeName,
-    faculty: apiAcc.faculty || '',
-    department: apiAcc.department || '',
-    startDate: apiAcc.startDate || '',
-    expiryDate: apiAcc.expiryDate,
-    email: apiAcc.email || '',
+    id: String(apiAcc.id),
+    programmeName: String(apiAcc.programmeName),
+    accreditationType: (apiAcc.accreditationType as AccreditationType) || 'programme',
+    faculty: String(apiAcc.faculty || ''),
+    department: String(apiAcc.department || ''),
+    startDate: String(apiAcc.startDate || ''),
+    expiryDate: String(apiAcc.expiryDate),
+    email: String(apiAcc.email || ''),
+    workflowStatus: (apiAcc.workflowStatus as WorkflowStatus) || 'accredited',
+    institutionId: String(apiAcc.institutionId || 'HTU'),
+    notes: String(apiAcc.notes || ''),
     daysUntilExpiry,
     status,
+    remarks: String(apiAcc.remarks || ''),
+    programmeCategory: (apiAcc.programmeCategory as 'EP' | 'NP') || 'EP',
+    firstAccreditationDate: String(apiAcc.firstAccreditationDate || ''),
+    snoozedUntil: apiAcc.snoozedUntil ? String(apiAcc.snoozedUntil) : undefined,
   };
 }
 
@@ -53,12 +89,24 @@ async function fetchApi<T>(
   options?: RequestInit
 ): Promise<ApiResponse<T>> {
   try {
-    const email = localStorage.getItem('auth_email');
-    const response = await fetch(`${API_BASE}${endpoint}`, {
-      headers: {
-        'Content-Type': 'application/json',
-        'X-User-Email': email || 'anonymous',
-      },
+    // Standardize on 'auth_email'
+    const email = localStorage.getItem('auth_email') || localStorage.getItem('userEmail');
+    const token = localStorage.getItem('auth_token');
+    
+    // Ensure endpoint starts with a slash
+    const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'X-User-Email': email || 'anonymous',
+    };
+
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_BASE}${path}`, {
+      headers,
       ...options,
     });
 
@@ -83,7 +131,7 @@ async function fetchApi<T>(
 export const api = {
   // Get all accreditations
   async getAccreditations(): Promise<ApiResponse<Accreditation[]>> {
-    const response = await fetchApi<any[]>('/accreditations');
+    const response = await fetchApi<Record<string, unknown>[]>('/accreditations');
     if (response.error || !response.data) {
       return { data: null, error: response.error };
     }
@@ -93,9 +141,38 @@ export const api = {
     };
   },
 
+  // Export accreditations to Excel
+  async exportAccreditations(): Promise<ApiResponse<Blob>> {
+    try {
+      const email = localStorage.getItem('auth_email') || 'anonymous';
+      const token = localStorage.getItem('auth_token');
+      
+      const headers: Record<string, string> = {
+        'X-User-Email': email,
+      };
+
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`${API_BASE}/export-accreditations`, {
+        headers,
+      });
+
+      if (!response.ok) {
+        return { data: null, error: `Failed to export: ${response.statusText}` };
+      }
+
+      const blob = await response.blob();
+      return { data: blob, error: null };
+    } catch (error) {
+      return { data: null, error: error instanceof Error ? error.message : 'Network error' };
+    }
+  },
+
   // Get single accreditation by ID
   async getAccreditation(id: string): Promise<ApiResponse<Accreditation>> {
-    const response = await fetchApi<any>(`/accreditations/${id}`);
+    const response = await fetchApi<Record<string, unknown>>(`/accreditations/${id}`);
     if (response.error || !response.data) {
       return { data: null, error: response.error };
     }
@@ -110,6 +187,7 @@ export const api = {
     const response = await fetchApi<{
       total: number;
       active: number;
+      upcoming: number;
       warning: number;
       critical: number;
       expired: number;
@@ -123,6 +201,7 @@ export const api = {
     return {
       data: {
         ...response.data,
+        snoozed: 0, // Placeholder as it's calculated on frontend
         complianceRate: total > 0 ? Math.round((active / total) * 100) : 0,
       },
       error: null,
@@ -147,12 +226,19 @@ export const api = {
   // Add a new accreditation
   async addAccreditation(acc: {
     programme_name: string;
+    accreditation_type?: string;
     faculty?: string;
     department?: string;
     start_date: string;
     expiry_date: string;
     email: string;
-  }): Promise<ApiResponse<any>> {
+    workflow_status?: string;
+    institution_id?: string;
+    snoozed_until?: string | null;
+    remarks?: string;
+    programme_category?: 'EP' | 'NP';
+    first_accreditation_date?: string;
+  }): Promise<ApiResponse<{ id: number }>> {
     return fetchApi('/accreditations', {
       method: 'POST',
       body: JSON.stringify(acc),
@@ -160,7 +246,7 @@ export const api = {
   },
 
   // Delete an accreditation
-  async deleteAccreditation(id: string): Promise<ApiResponse<any>> {
+  async deleteAccreditation(id: string): Promise<ApiResponse<{ success: boolean }>> {
     return fetchApi(`/accreditations/${id}`, {
       method: 'DELETE',
     });
@@ -169,12 +255,19 @@ export const api = {
   // Update an accreditation
   async updateAccreditation(id: string, acc: {
     programme_name: string;
+    accreditation_type?: string;
     faculty?: string;
     department?: string;
     start_date: string;
     expiry_date: string;
     email: string;
-  }): Promise<ApiResponse<any>> {
+    workflow_status?: string;
+    institution_id?: string;
+    snoozed_until?: string | null;
+    remarks?: string;
+    programme_category?: 'EP' | 'NP';
+    first_accreditation_date?: string;
+  }): Promise<ApiResponse<{ success: boolean }>> {
     return fetchApi(`/accreditations/${id}`, {
       method: 'PUT',
       body: JSON.stringify(acc),
@@ -182,15 +275,21 @@ export const api = {
   },
 
   // Login
-  async login(email: string, password: string): Promise<ApiResponse<{ role: 'super_admin' | 'admin' | 'user'; token: string }>> {
-    return fetchApi('/login', {
+  async login(email: string, password: string): Promise<ApiResponse<{ role: 'super_admin' | 'dean' | 'admin' | 'user'; department?: string; faculty?: string; token: string; email: string }>> {
+    const res = await fetchApi<{ role: 'super_admin' | 'dean' | 'admin' | 'user'; department?: string; faculty?: string; token: string; email: string }>('/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
+
+    if (res.data?.token) {
+      localStorage.setItem('auth_token', res.data.token);
+      localStorage.setItem('auth_email', res.data.email);
+    }
+    return res;
   },
 
   // Google Login
-  async googleLogin(credential: string): Promise<ApiResponse<{ role?: 'super_admin' | 'admin' | 'user'; token?: string; status?: string; message?: string; email?: string }>> {
+  async googleLogin(credential: string): Promise<ApiResponse<{ role?: 'super_admin' | 'dean' | 'admin' | 'user'; token?: string; status?: string; message?: string; email?: string; faculty?: string; department?: string }>> {
     return fetchApi('/google-login', {
 
       method: 'POST',
@@ -235,6 +334,82 @@ export const api = {
     return fetchApi('/monthly-report-preview');
   },
 
+  // Document Management
+  async getDocuments(accreditationId: string): Promise<ApiResponse<AccreditationDocument[]>> {
+    return fetchApi(`/accreditations/${accreditationId}/documents`);
+  },
+
+  async uploadDocument(accreditationId: string, file: File, documentType: string, notes?: string): Promise<ApiResponse<{ success: boolean; documentId: number }>> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('document_type', documentType);
+    if (notes) formData.append('notes', notes);
+
+    const userEmail = localStorage.getItem('auth_email') || localStorage.getItem('userEmail') || 'anonymous';
+    const token = localStorage.getItem('auth_token');
+
+    const headers: Record<string, string> = {
+      'X-User-Email': userEmail,
+    };
+
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE}/accreditations/${accreditationId}/documents`, {
+        method: 'POST',
+        headers,
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.details || errorData.error || `Upload failed: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return { data, error: null };
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+      return { data: null, error: errorMsg };
+    }
+  },
+
+  async deleteDocument(documentId: string): Promise<ApiResponse<{ success: boolean }>> {
+    return fetchApi(`/documents/${documentId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  getDocumentUrl(documentId: string): string {
+    return `${API_BASE}/documents/${documentId}`;
+  },
+
+  // Readiness Checklist
+  async getCheckpoints(accreditationId: string): Promise<ApiResponse<AccreditationCheckpoint[]>> {
+    return fetchApi(`/accreditations/${accreditationId}/checkpoints`);
+  },
+
+  async updateCheckpoint(checkpointId: string, isCompleted: boolean): Promise<ApiResponse<{ success: boolean }>> {
+    return fetchApi(`/checkpoints/${checkpointId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ isCompleted }),
+    });
+  },
+
+  async initializeCheckpoints(accreditationId: string): Promise<ApiResponse<{ success: boolean }>> {
+    return fetchApi(`/accreditations/${accreditationId}/initialize-checkpoints`, {
+      method: 'POST',
+    });
+  },
+
+  async resetCheckpoints(accreditationId: string): Promise<ApiResponse<{ success: boolean; message: string }>> {
+    return fetchApi(`/accreditations/${accreditationId}/reset-checkpoints`, {
+      method: 'POST',
+    });
+  },
+
   // Health check
 
 
@@ -244,46 +419,53 @@ export const api = {
   },
 
   // Audit Logs
-  async getAuditLogs(): Promise<ApiResponse<any[]>> {
-    return fetchApi('/audit-logs');
+  async getAuditLogs(): Promise<ApiResponse<AuditLog[]>> {
+    return fetchApi<AuditLog[]>('/audit-logs');
   },
 
   async getAuditAnalytics(): Promise<ApiResponse<{
     totalActionsToday: number;
     mostActiveAdmin: string;
-    lastCriticalAction: any | null;
+    lastCriticalAction: AuditLog | null;
   }>> {
     return fetchApi('/audit-analytics');
   },
 
   // User Management
-  async getUsers(): Promise<ApiResponse<any[]>> {
-    return fetchApi('/users');
+  async getUsers(): Promise<ApiResponse<UserAccount[]>> {
+    return fetchApi<UserAccount[]>('/users');
   },
 
-  async createUser(userData: any): Promise<ApiResponse<{ success: boolean; message: string }>> {
-    return fetchApi('/users', {
+  async createUser(userData: { username: string; email: string; password?: string; role: string; faculty?: string; department?: string }): Promise<ApiResponse<{ success: boolean; message: string }>> {
+    return fetchApi<{ success: boolean; message: string }>('/users', {
       method: 'POST',
       body: JSON.stringify(userData),
     });
   },
 
   async deleteUser(userId: string): Promise<ApiResponse<{ success: boolean; message: string }>> {
-    return fetchApi(`/users/${userId}`, {
+    return fetchApi<{ success: boolean; message: string }>(`/users/${userId}`, {
       method: 'DELETE',
     });
   },
 
   async resetUserPassword(userId: string): Promise<ApiResponse<{ success: boolean; message: string }>> {
-    return fetchApi('/users/reset-password', {
+    return fetchApi<{ success: boolean; message: string }>('/users/reset-password', {
       method: 'POST',
       body: JSON.stringify({ userId }),
     });
   },
 
   async approveUser(userId: string): Promise<ApiResponse<{ success: boolean; message: string }>> {
-    return fetchApi(`/users/${userId}/approve`, {
+    return fetchApi<{ success: boolean; message: string }>(`/users/${userId}/approve`, {
       method: 'POST',
+    });
+  },
+
+  async updateUser(userId: string, userData: { role?: string; faculty?: string; department?: string; status?: string }): Promise<ApiResponse<{ success: boolean; message: string }>> {
+    return fetchApi<{ success: boolean; message: string }>(`/users/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify(userData),
     });
   },
 };

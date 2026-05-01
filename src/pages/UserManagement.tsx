@@ -45,12 +45,19 @@ import { format } from "date-fns";
 import { Header } from "@/components/Header";
 import { useAuth } from "@/components/AuthContext";
 import { Navigate } from "react-router-dom";
+import { HTU_STRUCTURE } from "@/lib/htu-structure";
+import { 
+    SelectGroup, 
+    SelectLabel 
+} from "@/components/ui/select";
 
 interface UserAccount {
     id: string;
     username: string;
     email: string;
-    role: 'super_admin' | 'admin' | 'user';
+    role: 'super_admin' | 'dean' | 'admin' | 'user';
+    department: string | null;
+    faculty: string | null;
     status: 'active' | 'pending_approval';
     created_at: string;
 }
@@ -62,13 +69,24 @@ const UserManagement = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [isCreating, setIsCreating] = useState(false);
     const [openAddDialog, setOpenAddDialog] = useState(false);
-
-    const [newUser, setNewUser] = useState({
+    const [newUser, setNewUser] = useState<{
+        username: string;
+        email: string;
+        password: string;
+        role: 'dean' | 'admin' | 'user';
+        department: string;
+        faculty: string;
+    }>({
         username: "",
         email: "",
         password: "",
-        role: "admin"
+        role: "user",
+        department: "",
+        faculty: ""
     });
+
+    const [editingUser, setEditingUser] = useState<UserAccount | null>(null);
+    const [isUpdating, setIsUpdating] = useState(false);
 
     useEffect(() => {
         fetchUsers();
@@ -96,7 +114,7 @@ const UserManagement = () => {
         } else {
             toast.success("User account created successfully");
             setOpenAddDialog(false);
-            setNewUser({ username: "", email: "", password: "", role: "admin" });
+            setNewUser({ username: "", email: "", password: "", role: "user", department: "", faculty: "" });
             fetchUsers();
         }
     };
@@ -148,6 +166,27 @@ const UserManagement = () => {
                 toast.success(`User ${user.email} approved and notified!`);
                 fetchUsers();
             }
+        }
+    };
+
+    const handleUpdateUser = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingUser) return;
+
+        setIsUpdating(true);
+        const { error } = await api.updateUser(editingUser.id, {
+            role: editingUser.role,
+            department: editingUser.department || "",
+            faculty: editingUser.faculty || ""
+        });
+        setIsUpdating(false);
+
+        if (error) {
+            toast.error(error);
+        } else {
+            toast.success("User updated successfully");
+            setEditingUser(null);
+            fetchUsers();
         }
     };
 
@@ -236,17 +275,62 @@ const UserManagement = () => {
                                         <Label htmlFor="role">System Role</Label>
                                         <Select
                                             value={newUser.role}
-                                            onValueChange={(val) => setNewUser({ ...newUser, role: val })}
+                                            onValueChange={(val) => setNewUser({ ...newUser, role: val as 'dean' | 'admin' | 'user' })}
                                         >
                                             <SelectTrigger>
                                                 <SelectValue placeholder="Select a role" />
                                             </SelectTrigger>
                                             <SelectContent>
+                                                <SelectItem value="dean">Dean (Faculty-wide)</SelectItem>
                                                 <SelectItem value="admin">Administrator (Manager)</SelectItem>
-                                                <SelectItem value="user">Viewer (Read-only)</SelectItem>
+                                                <SelectItem value="user">HOD / Viewer (Departmental)</SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>
+                                    {newUser.role === 'dean' ? (
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="faculty">Managing Faculty</Label>
+                                            <Select
+                                                value={newUser.faculty}
+                                                onValueChange={(val) => setNewUser({ ...newUser, faculty: val, department: "" })}
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select Faculty" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {HTU_STRUCTURE.map(faculty => (
+                                                        <SelectItem key={faculty.name} value={faculty.name}>{faculty.name}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <p className="text-[10px] text-muted-foreground">Deans have access to all departments within their faculty.</p>
+                                        </div>
+                                    ) : (
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="department">Managing Department (If HOD)</Label>
+                                            <Select
+                                                value={newUser.department}
+                                                onValueChange={(val) => setNewUser({ ...newUser, department: val, faculty: "" })}
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select Department" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="none">None / General</SelectItem>
+                                                    {HTU_STRUCTURE.map(faculty => (
+                                                        <SelectGroup key={faculty.name}>
+                                                            <SelectLabel className="text-xs font-bold text-muted-foreground uppercase mt-2">{faculty.name}</SelectLabel>
+                                                            {faculty.departments.map(dept => (
+                                                                <SelectItem key={dept.name} value={dept.name}>{dept.name}</SelectItem>
+                                                            ))}
+                                                        </SelectGroup>
+                                                    ))}
+                                                    <SelectItem value="OTHER">Other / Custom</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                            <p className="text-[10px] text-muted-foreground">Required for HODs to filter their dashboard view.</p>
+                                        </div>
+                                    )}
                                 </div>
                                 <DialogFooter>
                                     <Button type="submit" className="w-full h-11" disabled={isCreating}>
@@ -279,6 +363,8 @@ const UserManagement = () => {
                                     <TableRow>
                                         <TableHead className="w-[250px] font-semibold py-4">Identity</TableHead>
                                         <TableHead className="font-semibold py-4">Email Address</TableHead>
+                                        <TableHead className="font-semibold py-4">Department</TableHead>
+                                        <TableHead className="font-semibold py-4">Faculty</TableHead>
                                         <TableHead className="font-semibold py-4">System Role</TableHead>
                                         <TableHead className="font-semibold py-4">Status</TableHead>
                                         <TableHead className="font-semibold py-4">Joined Date</TableHead>
@@ -298,6 +384,7 @@ const UserManagement = () => {
                                                 <TableCell className="py-4">
                                                     <div className="flex items-center gap-3">
                                                         <div className={`h-10 w-10 rounded-full flex items-center justify-center ${user.role === 'super_admin' ? 'bg-amber-100 text-amber-700' :
+                                                            user.role === 'dean' ? 'bg-purple-100 text-purple-700' :
                                                             user.role === 'admin' ? 'bg-primary/10 text-primary' : 'bg-slate-100 text-slate-600'
                                                             }`}>
                                                             {user.role === 'super_admin' ? <ShieldCheck className="h-5 w-5" /> : <UserIcon className="h-5 w-5" />}
@@ -308,8 +395,15 @@ const UserManagement = () => {
                                                 <TableCell className="text-slate-600 font-medium py-4">
                                                     {user.email}
                                                 </TableCell>
+                                                <TableCell className="text-slate-500 font-medium py-4">
+                                                    {user.department || 'N/A'}
+                                                </TableCell>
+                                                <TableCell className="text-slate-500 font-medium py-4">
+                                                    {user.faculty || 'N/A'}
+                                                </TableCell>
                                                 <TableCell className="py-4">
                                                     <Badge className={`px-2.5 py-1 font-medium capitalize border-none shadow-sm ${user.role === 'super_admin' ? 'bg-amber-500 text-white' :
+                                                        user.role === 'dean' ? 'bg-purple-600 text-white' :
                                                         user.role === 'admin' ? 'bg-primary text-white' : 'bg-slate-400 text-white'
                                                         }`}>
                                                         {user.role.replace('_', ' ')}
@@ -346,6 +440,15 @@ const UserManagement = () => {
                                                             <Button
                                                                 variant="ghost"
                                                                 size="icon"
+                                                                className="text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                                                                onClick={() => setEditingUser(user)}
+                                                                title="Edit Access"
+                                                            >
+                                                                <UserCog className="h-5 w-5" />
+                                                            </Button>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
                                                                 className="text-slate-500 hover:text-primary hover:bg-slate-100 transition-colors"
                                                                 onClick={() => handleResetPassword(user.id, user.email)}
                                                                 title="Trigger Password Reset"
@@ -377,6 +480,89 @@ const UserManagement = () => {
                         </div>
                     </CardContent>
                 </Card>
+
+                {/* Edit User Dialog */}
+                <Dialog open={!!editingUser} onOpenChange={(open) => !open && setEditingUser(null)}>
+                    <DialogContent className="sm:max-w-[425px]">
+                        {editingUser && (
+                            <form onSubmit={handleUpdateUser}>
+                                <DialogHeader>
+                                    <DialogTitle>Edit User Access</DialogTitle>
+                                    <DialogDescription>
+                                        Update role and department for {editingUser.email}.
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <div className="grid gap-4 py-6">
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="edit-role">System Role</Label>
+                                        <Select
+                                            value={editingUser.role}
+                                            onValueChange={(val) => setEditingUser({ ...editingUser, role: val as 'super_admin' | 'dean' | 'admin' | 'user' })}
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select a role" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="super_admin">Super Admin</SelectItem>
+                                                <SelectItem value="dean">Dean (Faculty-wide)</SelectItem>
+                                                <SelectItem value="admin">Administrator (Manager)</SelectItem>
+                                                <SelectItem value="user">HOD / Viewer (Departmental)</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    {editingUser.role === 'dean' ? (
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="edit-faculty">Assigned Faculty</Label>
+                                            <Select
+                                                value={editingUser.faculty || ""}
+                                                onValueChange={(val) => setEditingUser({ ...editingUser, faculty: val, department: "" })}
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select Faculty" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {HTU_STRUCTURE.map(faculty => (
+                                                        <SelectItem key={faculty.name} value={faculty.name}>{faculty.name}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    ) : (
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="edit-department">Assigned Department</Label>
+                                            <Select
+                                                value={editingUser.department || ""}
+                                                onValueChange={(val) => setEditingUser({ ...editingUser, department: val, faculty: "" })}
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select Department" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="none">None / General</SelectItem>
+                                                    {HTU_STRUCTURE.map(faculty => (
+                                                        <SelectGroup key={faculty.name}>
+                                                            <SelectLabel className="text-xs font-bold text-muted-foreground uppercase mt-2">{faculty.name}</SelectLabel>
+                                                            {faculty.departments.map(dept => (
+                                                                <SelectItem key={dept.name} value={dept.name}>{dept.name}</SelectItem>
+                                                            ))}
+                                                        </SelectGroup>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <p className="text-[10px] text-muted-foreground italic">Important: This must exactly match the "Department" in the accreditations table.</p>
+                                        </div>
+                                    )}
+                                </div>
+                                <DialogFooter>
+                                    <Button type="submit" className="w-full h-11 bg-blue-600 hover:bg-blue-700" disabled={isUpdating}>
+                                        {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                        Save Changes
+                                    </Button>
+                                </DialogFooter>
+                            </form>
+                        )}
+                    </DialogContent>
+                </Dialog>
             </main>
         </div>
     );

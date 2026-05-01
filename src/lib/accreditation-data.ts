@@ -1,25 +1,81 @@
 import { differenceInDays, format, parseISO, isValid } from "date-fns";
 
-export type AccreditationStatus = "active" | "warning" | "critical" | "expired";
+export type AccreditationStatus = "active" | "upcoming" | "warning" | "critical" | "expired" | "snoozed" | "not_yet_accredited";
+export type AccreditationType = "programme" | "institutional";
+export type WorkflowStatus = "self_assessment" | "application_submitted" | "vetting" | "visitation" | "accredited";
 
 export interface Accreditation {
   id: string;
   programmeName: string;
+  accreditationType: AccreditationType;
   faculty: string;
   department: string;
   startDate: string;
   expiryDate: string;
   email: string;
+  workflowStatus: WorkflowStatus;
+  institutionId: string;
   daysUntilExpiry: number;
   status: AccreditationStatus;
+  notes?: string;
+  completionPercentage?: number;
+  documentCount?: number;
+  snoozedUntil?: string;
+  remarks?: string;
+  programmeCategory?: 'EP' | 'NP';
+  firstAccreditationDate?: string;
+}
+
+export interface AccreditationDocument {
+  id: string;
+  documentType: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  uploadedAt: string;
+  notes?: string;
+}
+
+export interface AccreditationCheckpoint {
+  id: string;
+  checkpointName: string;
+  isCompleted: boolean;
+  updatedAt: string;
+  workflowStage?: WorkflowStatus;
+}
+
+export interface UserAccount {
+  id: string;
+  username: string;
+  email: string;
+  role: 'super_admin' | 'dean' | 'admin' | 'user';
+  department: string | null;
+  faculty: string | null;
+  status: 'active' | 'pending_approval';
+  created_at: string;
+}
+
+export interface AuditLog {
+  id: number;
+  user_email: string;
+  action: string;
+  method: string;
+  path: string;
+  details: string;
+  ip_address: string;
+  timestamp: string;
+  status?: number;
 }
 
 export interface DashboardMetrics {
   total: number;
   active: number;
+  upcoming: number;
   warning: number;
   critical: number;
   expired: number;
+  snoozed: number;
+  not_yet_accredited: number;
   complianceRate: number;
 }
 
@@ -30,38 +86,61 @@ function excelSerialToDate(serial: number): Date {
   return new Date(excelEpoch.getTime() + serial * 86400000);
 }
 
+// Normalise human-readable date strings into something Date() can parse.
+// Handles formats found in the HTU template like:
+//   "31st Aug. 2027", "September 31, 2028", "  Aug. 31, 2025", "Dec 31, 2027/2029"
+function normaliseHumanDate(raw: string): string {
+  let s = raw.trim();
+  // Ambiguous dual-year "2027/2029" — take the later year
+  s = s.replace(/(\d{4})\/(\d{4})/g, (_, y1, y2) =>
+    String(Math.max(Number(y1), Number(y2)))
+  );
+  // Strip ordinal suffixes: 31st → 31, 22nd → 22, 3rd → 3, 4th → 4
+  s = s.replace(/(\d+)(st|nd|rd|th)\b/gi, "$1");
+  // Normalise abbreviated months with trailing dots: "Aug." → "Aug", "Sept." → "Sep"
+  s = s.replace(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\./gi, "$1");
+  // Collapse multiple spaces
+  s = s.replace(/\s+/g, " ").trim();
+  return s;
+}
+
 // Parse various date formats to ISO string
-export function parseExcelDate(value: any): string {
+export function parseExcelDate(value: unknown): string {
   if (!value) return "";
 
-  // If it's already a valid date string
+  // String handling
   if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return "";
+
     // Try ISO format first
-    const isoDate = parseISO(value);
+    const isoDate = parseISO(trimmed);
     if (isValid(isoDate)) {
       return format(isoDate, "yyyy-MM-dd");
     }
 
-    // Try various date formats
-    const formats = [
-      /(\d{1,2})\/(\d{1,2})\/(\d{4})/, // DD/MM/YYYY or MM/DD/YYYY
-      /(\d{4})-(\d{1,2})-(\d{1,2})/, // YYYY-MM-DD
-      /(\d{1,2})-(\d{1,2})-(\d{4})/, // DD-MM-YYYY
+    // Try various numeric formats (DD/MM/YYYY, YYYY-MM-DD, DD-MM-YYYY)
+    const numericFormats = [
+      /(\d{1,2})\/(\d{1,2})\/(\d{4})/,
+      /(\d{4})-(\d{1,2})-(\d{1,2})/,
+      /(\d{1,2})-(\d{1,2})-(\d{4})/,
     ];
-
-    for (const regex of formats) {
-      const match = value.match(regex);
-      if (match) {
-        // Try to parse as date
-        const date = new Date(value);
-        if (isValid(date)) {
-          return format(date, "yyyy-MM-dd");
-        }
+    for (const regex of numericFormats) {
+      if (trimmed.match(regex)) {
+        const date = new Date(trimmed);
+        if (isValid(date)) return format(date, "yyyy-MM-dd");
       }
+    }
+
+    // Try normalising human-readable formats
+    const normalised = normaliseHumanDate(trimmed);
+    const humanDate = new Date(normalised);
+    if (isValid(humanDate)) {
+      return format(humanDate, "yyyy-MM-dd");
     }
   }
 
-  // If it's a number (Excel serial date)
+  // Excel serial number
   if (typeof value === "number") {
     const date = excelSerialToDate(value);
     if (isValid(date)) {
@@ -69,7 +148,7 @@ export function parseExcelDate(value: any): string {
     }
   }
 
-  // If it's a Date object
+  // Date object
   if (value instanceof Date && isValid(value)) {
     return format(value, "yyyy-MM-dd");
   }
@@ -86,10 +165,15 @@ export function calculateDaysUntilExpiry(expiryDate: string): number {
 }
 
 // Determine status based on days until expiry
-export function getStatus(daysUntilExpiry: number): AccreditationStatus {
+export function getStatus(daysUntilExpiry: number, snoozedUntil?: string): AccreditationStatus {
+  if (snoozedUntil && new Date(snoozedUntil) > new Date()) {
+    return "snoozed";
+  }
+
   if (daysUntilExpiry <= 0) return "expired";
   if (daysUntilExpiry <= 90) return "critical"; // 3 months
   if (daysUntilExpiry <= 365) return "warning"; // 12 months
+  if (daysUntilExpiry <= 450) return "upcoming"; // 15 months
   return "active";
 }
 
@@ -97,11 +181,29 @@ export function getStatus(daysUntilExpiry: number): AccreditationStatus {
 export function getStatusLabel(status: AccreditationStatus): string {
   const labels: Record<AccreditationStatus, string> = {
     active: "Active",
+    upcoming: "Upcoming Renewal",
     warning: "Warning",
     critical: "Critical",
     expired: "Expired",
+    snoozed: "Snoozed",
+    not_yet_accredited: "Not Yet Accredited",
   };
   return labels[status];
+}
+
+export function getWorkflowLabel(status: WorkflowStatus): string {
+  const labels: Record<WorkflowStatus, string> = {
+    self_assessment: "Self-Assessment",
+    application_submitted: "Application Submitted",
+    vetting: "GTEC Vetting",
+    visitation: "GTEC Visitation",
+    accredited: "Fully Accredited",
+  };
+  return labels[status];
+}
+
+export function getAccreditationTypeLabel(type: AccreditationType): string {
+  return type === "programme" ? "Programme Accreditation" : "Institutional Accreditation";
 }
 
 // Column name mappings for flexible Excel parsing
@@ -149,10 +251,39 @@ const columnMappings = {
     "Department Name",
     "Section",
   ],
+  accreditationType: [
+    "Accreditation Type",
+    "Type",
+    "Programme/Institutional",
+  ],
+  workflowStatus: [
+    "Workflow Status",
+    "GTEC Status",
+    "GTEC Stage",
+    "Workflow Stage",
+  ],
+  remarks: [
+    "Remarks",
+    "Administrative Remarks",
+    "Comments",
+    "Notes",
+  ],
+  programmeCategory: [
+    "Category",
+    "Programme Category",
+    "Type (EP/NP)",
+    "Status (EP/NP)",
+  ],
+  firstAccreditationDate: [
+    "First Accreditation Date",
+    "First Accreditation",
+    "1st Accreditation",
+    "Original Accreditation Date",
+  ],
 };
 
 // Find matching column name
-function findColumnName(row: any, possibleNames: string[]): string | null {
+function findColumnName(row: Record<string, unknown>, possibleNames: string[]): string | null {
   const keys = Object.keys(row);
   for (const name of possibleNames) {
     const found = keys.find(
@@ -164,7 +295,7 @@ function findColumnName(row: any, possibleNames: string[]): string | null {
 }
 
 // Process raw Excel data into Accreditation objects
-export function processAccreditationData(rawData: any[]): Accreditation[] {
+export function processAccreditationData(rawData: Record<string, unknown>[]): Accreditation[] {
   if (!rawData || rawData.length === 0) return [];
 
   // Find column names from first row
@@ -175,11 +306,16 @@ export function processAccreditationData(rawData: any[]): Accreditation[] {
   const emailCol = findColumnName(firstRow, columnMappings.email);
   const facultyCol = findColumnName(firstRow, columnMappings.faculty);
   const departmentCol = findColumnName(firstRow, columnMappings.department);
+  const typeCol = findColumnName(firstRow, columnMappings.accreditationType);
+  const workflowCol = findColumnName(firstRow, columnMappings.workflowStatus);
+  const remarksCol = findColumnName(firstRow, columnMappings.remarks);
+  const categoryCol = findColumnName(firstRow, columnMappings.programmeCategory);
+  const firstAccrCol = findColumnName(firstRow, columnMappings.firstAccreditationDate);
 
-  if (!programmeCol || !expiryCol) {
+  if (!programmeCol) {
     console.error("Required columns not found. Found columns:", Object.keys(firstRow));
     throw new Error(
-      "Required columns not found. Please ensure your Excel file has 'Programme Name' and 'Expiry Date' columns."
+      "Required columns not found. Please ensure your Excel file has a 'Programme Name' column."
     );
   }
 
@@ -190,15 +326,50 @@ export function processAccreditationData(rawData: any[]): Accreditation[] {
       const startDateRaw = startCol ? row[startCol] : null;
       const email = emailCol ? row[emailCol]?.toString()?.trim() || "" : "";
 
-      if (!programmeName || !expiryDateRaw) return null;
+      // Skip rows with no programme name
+      if (!programmeName) return null;
 
-      const expiryDate = parseExcelDate(expiryDateRaw);
+      const expiryDate = expiryDateRaw ? parseExcelDate(expiryDateRaw) : "";
       const startDate = startDateRaw ? parseExcelDate(startDateRaw) : "";
 
       const faculty = facultyCol ? row[facultyCol]?.toString()?.trim() || "" : "";
       const department = departmentCol ? row[departmentCol]?.toString()?.trim() || "" : "";
 
-      if (!expiryDate) return null;
+      const accreditationTypeRaw = typeCol ? row[typeCol]?.toString()?.toLowerCase()?.trim() : "";
+      const accreditationType: AccreditationType =
+        accreditationTypeRaw?.includes("inst") ? "institutional" : "programme";
+
+      const workflowRaw = workflowCol ? row[workflowCol]?.toString()?.toLowerCase()?.replace(/\s+/g, '_')?.trim() : "";
+      let workflowStatus: WorkflowStatus = "self_assessment";
+
+      if (workflowRaw) {
+        if (workflowRaw.includes("self") || workflowRaw.includes("assessment")) workflowStatus = "self_assessment";
+        else if (workflowRaw.includes("sub") || workflowRaw.includes("apply")) workflowStatus = "application_submitted";
+        else if (workflowRaw.includes("vet")) workflowStatus = "vetting";
+        else if (workflowRaw.includes("visit")) workflowStatus = "visitation";
+        else if (workflowRaw.includes("accred")) workflowStatus = "accredited";
+      }
+
+      // If no expiry date → Not Yet Accredited (awaiting GTEC decision)
+      if (!expiryDate) {
+        return {
+          id: `acc-${index + 1}`,
+          programmeName,
+          faculty,
+          department,
+          startDate,
+          expiryDate: "",
+          email,
+          accreditationType,
+          workflowStatus,
+          institutionId: "HTU",
+          daysUntilExpiry: 0,
+          status: "not_yet_accredited" as AccreditationStatus,
+          remarks: remarksCol ? row[remarksCol]?.toString()?.trim() || "" : "",
+          programmeCategory: categoryCol ? (row[categoryCol]?.toString()?.trim() === 'NP' ? 'NP' : 'EP') : 'EP',
+          firstAccreditationDate: firstAccrCol ? parseExcelDate(row[firstAccrCol]) : "",
+        };
+      }
 
       const daysUntilExpiry = calculateDaysUntilExpiry(expiryDate);
       const status = getStatus(daysUntilExpiry);
@@ -211,8 +382,14 @@ export function processAccreditationData(rawData: any[]): Accreditation[] {
         startDate,
         expiryDate,
         email,
+        accreditationType,
+        workflowStatus,
+        institutionId: "HTU",
         daysUntilExpiry,
         status,
+        remarks: remarksCol ? row[remarksCol]?.toString()?.trim() || "" : "",
+        programmeCategory: categoryCol ? (row[categoryCol]?.toString()?.trim() === 'NP' ? 'NP' : 'EP') : 'EP',
+        firstAccreditationDate: firstAccrCol ? parseExcelDate(row[firstAccrCol]) : "",
       };
     })
     .filter((item): item is Accreditation => item !== null);
@@ -222,12 +399,17 @@ export function processAccreditationData(rawData: any[]): Accreditation[] {
 export function calculateMetrics(accreditations: Accreditation[]): DashboardMetrics {
   const total = accreditations.length;
   const active = accreditations.filter((a) => a.status === "active").length;
+  const upcoming = accreditations.filter((a) => a.status === "upcoming").length;
   const warning = accreditations.filter((a) => a.status === "warning").length;
   const critical = accreditations.filter((a) => a.status === "critical").length;
   const expired = accreditations.filter((a) => a.status === "expired").length;
-  const complianceRate = total > 0 ? Math.round((active / total) * 100) : 0;
+  const snoozed = accreditations.filter((a) => a.snoozedUntil && new Date(a.snoozedUntil) > new Date()).length;
+  const not_yet_accredited = accreditations.filter((a) => a.status === "not_yet_accredited").length;
+  // Compliance rate excludes not_yet_accredited from denominator
+  const accreditedTotal = total - not_yet_accredited;
+  const complianceRate = accreditedTotal > 0 ? Math.round((active / accreditedTotal) * 100) : 0;
 
-  return { total, active, warning, critical, expired, complianceRate };
+  return { total, active, upcoming, warning, critical, expired, snoozed, not_yet_accredited, complianceRate };
 }
 
 // Format days until expiry for display
@@ -293,7 +475,7 @@ Immediate action is required to:
 Please treat this as a matter of highest priority and respond with an action plan within 24 hours.
 
 Best regards,
-Quality Assurance Unit`,
+OFFICE OF THE PRO-VICE CHANCELLOR`,
     };
   }
 
@@ -315,7 +497,7 @@ Immediate action is required to:
 Please provide an update on the renewal status within 48 hours.
 
 Best regards,
-Quality Assurance Unit`,
+OFFICE OF THE PRO-VICE CHANCELLOR`,
     };
   }
 
@@ -337,7 +519,7 @@ Recommended actions:
 Please begin the renewal planning process and provide a timeline for completion.
 
 Best regards,
-Quality Assurance Unit`,
+OFFICE OF THE PRO-VICE CHANCELLOR`,
   };
 }
 
@@ -346,88 +528,112 @@ export const sampleAccreditations: Accreditation[] = [
   {
     id: "acc-1",
     programmeName: "BSc Computer Science",
+    accreditationType: "programme",
     faculty: "Faculty of Applied Sciences",
     department: "Computer Science",
     startDate: "2021-09-01",
     expiryDate: "2025-08-31",
     email: "cs.dept@university.edu",
+    workflowStatus: "accredited",
+    institutionId: "HTU",
     daysUntilExpiry: calculateDaysUntilExpiry("2025-08-31"),
     status: getStatus(calculateDaysUntilExpiry("2025-08-31")),
   },
   {
     id: "acc-2",
     programmeName: "BSc Electrical Engineering",
+    accreditationType: "programme",
     faculty: "Faculty of Engineering",
     department: "Electrical Engineering",
     startDate: "2022-01-15",
     expiryDate: "2025-05-15",
     email: "ee.dept@university.edu",
+    workflowStatus: "accredited",
+    institutionId: "HTU",
     daysUntilExpiry: calculateDaysUntilExpiry("2025-05-15"),
     status: getStatus(calculateDaysUntilExpiry("2025-05-15")),
   },
   {
     id: "acc-3",
     programmeName: "HND Accountancy",
+    accreditationType: "programme",
     faculty: "Faculty of Business",
     department: "Accountancy",
     startDate: "2022-06-01",
     expiryDate: "2026-06-30",
     email: "accountancy@university.edu",
+    workflowStatus: "accredited",
+    institutionId: "HTU",
     daysUntilExpiry: calculateDaysUntilExpiry("2026-06-30"),
     status: getStatus(calculateDaysUntilExpiry("2026-06-30")),
   },
   {
     id: "acc-4",
     programmeName: "BSc Mechanical Engineering",
+    accreditationType: "programme",
     faculty: "Faculty of Engineering",
     department: "Mechanical Engineering",
     startDate: "2020-09-01",
     expiryDate: "2025-02-28",
     email: "mech.eng@university.edu",
+    workflowStatus: "accredited",
+    institutionId: "HTU",
     daysUntilExpiry: calculateDaysUntilExpiry("2025-02-28"),
     status: getStatus(calculateDaysUntilExpiry("2025-02-28")),
   },
   {
     id: "acc-5",
     programmeName: "MBA Business Administration",
+    accreditationType: "programme",
     faculty: "Faculty of Business",
     department: "Business Administration",
     startDate: "2023-01-15",
     expiryDate: "2028-01-14",
     email: "business@university.edu",
+    workflowStatus: "accredited",
+    institutionId: "HTU",
     daysUntilExpiry: calculateDaysUntilExpiry("2028-01-14"),
     status: getStatus(calculateDaysUntilExpiry("2028-01-14")),
   },
   {
     id: "acc-6",
     programmeName: "BSc Nursing",
+    accreditationType: "programme",
     faculty: "Faculty of Applied Health Sciences",
     department: "Nursing",
     startDate: "2021-03-01",
     expiryDate: "2024-12-31",
     email: "nursing@university.edu",
+    workflowStatus: "accredited",
+    institutionId: "HTU",
     daysUntilExpiry: calculateDaysUntilExpiry("2024-12-31"),
     status: getStatus(calculateDaysUntilExpiry("2024-12-31")),
   },
   {
     id: "acc-7",
     programmeName: "HND Civil Engineering",
+    accreditationType: "programme",
     faculty: "Faculty of Engineering",
     department: "Civil Engineering",
     startDate: "2022-09-01",
     expiryDate: "2027-08-31",
     email: "civil.eng@university.edu",
+    workflowStatus: "accredited",
+    institutionId: "HTU",
     daysUntilExpiry: calculateDaysUntilExpiry("2027-08-31"),
     status: getStatus(calculateDaysUntilExpiry("2027-08-31")),
   },
   {
     id: "acc-8",
     programmeName: "BSc Pharmacy",
+    accreditationType: "programme",
     faculty: "Faculty of Applied Health Sciences",
     department: "Pharmacy",
     startDate: "2020-06-01",
     expiryDate: "2025-07-15",
     email: "pharmacy@university.edu",
+    workflowStatus: "accredited",
+    institutionId: "HTU",
     daysUntilExpiry: calculateDaysUntilExpiry("2025-07-15"),
     status: getStatus(calculateDaysUntilExpiry("2025-07-15")),
   },

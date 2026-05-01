@@ -2,10 +2,10 @@
     "name": "htu-accreditation-api",
     "version": "1.0.0",
     "description": "Backend for HTU Accreditation Monitoring System",
-    "main": "server.js",
+    "main": "app.js",
     "scripts": {
-        "start": "node server.js",
-        "dev": "node --watch server.js",
+        "start": "node app.js",
+        "dev": "node --watch app.js",
         "db:setup": "node setup_db.js"
     },
     "keywords": [],
@@ -16,9 +16,13 @@
         "cors": "^2.8.5",
         "dotenv": "^16.4.5",
         "express": "^4.19.2",
+        "express-rate-limit": "^8.3.2",
         "googleapis": "^171.4.0",
+        "jsonwebtoken": "^9.0.3",
+        "multer": "^2.1.1",
         "mysql2": "^3.9.7",
         "node-cron": "^4.2.1",
-        "nodemailer": "^8.0.1"
+        "nodemailer": "^8.0.1",
+        "xlsx": "^0.18.5"
     }
 }

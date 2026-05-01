@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import * as XLSX from "xlsx";
 import { processAccreditationData, Accreditation } from "@/lib/accreditation-data";
+import { toast } from "sonner";
 
 interface ExcelUploadProps {
   onDataLoaded: (data: Accreditation[]) => void;
@@ -32,7 +33,7 @@ export function ExcelUpload({ onDataLoaded }: ExcelUploadProps) {
         const workbook = XLSX.read(data, { type: "array" });
         const firstSheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[firstSheetName];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet);
+        const jsonData = XLSX.utils.sheet_to_json(worksheet) as Record<string, unknown>[];
 
         if (jsonData.length === 0) {
           throw new Error("The Excel file appears to be empty.");
@@ -99,6 +100,35 @@ export function ExcelUpload({ onDataLoaded }: ExcelUploadProps) {
     }
   };
 
+  const handleDownloadTemplate = () => {
+    const templateData = [
+      {
+        "Programme Name": "Example BSc Computer Science",
+        "Accreditation Type": "programme",
+        "Faculty": "Faculty of Applied Sciences",
+        "Department": "Computer Science",
+        "Accreditation Start Date": "2020-01-01",
+        "Accreditation Expiry Date": "2025-01-01",
+        "Responsible Email": "hod.cs@htu.edu.gh",
+        "Workflow Status": "accredited",
+        "Category": "EP",
+        "First Accreditation": "2015-06-15",
+        "Comments": "Standard programme"
+      }
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(templateData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Template");
+    
+    // Auto-size columns
+    const maxWidths = [30, 20, 25, 20, 22, 22, 25, 18, 15, 20, 30];
+    worksheet["!cols"] = maxWidths.map(w => ({ wch: w }));
+
+    XLSX.writeFile(workbook, "HTU_Accreditation_Template.xlsx");
+    toast.success("Template downloaded successfully!");
+  };
+
   return (
     <>
       <Button
@@ -116,7 +146,7 @@ export function ExcelUpload({ onDataLoaded }: ExcelUploadProps) {
             <DialogTitle>Upload Accreditation Data</DialogTitle>
             <DialogDescription>
               {pendingFile
-                ? "Confim that you want to upload this file. This will update your system records."
+                ? "Confirm that you want to upload this file. This will update your system records."
                 : "Upload an Excel file containing your programme accreditation data."}
             </DialogDescription>
           </DialogHeader>
@@ -176,22 +206,27 @@ export function ExcelUpload({ onDataLoaded }: ExcelUploadProps) {
           <div className="rounded-lg bg-muted/50 p-4">
             <div className="flex items-center justify-between mb-2">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Expected columns:</p>
-              <a
-                href="/sample_accreditation_data.xlsx"
-                download
+              <button
+                onClick={handleDownloadTemplate}
                 className="flex items-center gap-1.5 text-xs font-medium text-accent hover:text-accent/80 transition-colors"
+                type="button"
               >
                 <Download className="h-3 w-3" />
                 Download Sample Template
-              </a>
+              </button>
             </div>
-            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-[10px] text-muted-foreground">
               <li>• Programme Name (required)</li>
+              <li>• Accreditation Expiry (required)</li>
+              <li>• Accreditation Type (optional)</li>
               <li>• Faculty / School (optional)</li>
               <li>• Department (optional)</li>
-              <li>• Accreditation Expiry Date (required)</li>
-              <li>• Accreditation Start Date (optional)</li>
-              <li>• Responsible Email Address (optional)</li>
+              <li>• Workflow Status (optional)</li>
+              <li>• Responsible Email (optional)</li>
+              <li>• Start Date (optional)</li>
+              <li>• Category (EP/NP) (optional)</li>
+              <li>• First Accreditation (optional)</li>
+              <li>• Comments (optional)</li>
             </ul>
           </div>
         </DialogContent>

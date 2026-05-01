@@ -1,0 +1,12 @@
+---
+deployment:
+  tasks:
+    # 1. Install frontend dependencies and build
+    - export DEPLOYPATH=/home/$(whoami)/htudeploy
+    - /usr/local/bin/npm install --prefix $DEPLOYPATH
+    - /usr/local/bin/npm run build --prefix $DEPLOYPATH
+
+    # 2. Install backend dependencies
+    - /usr/local/bin/npm install --prefix $DEPLOYPATH/backend
+
+    # 3. Restart the Node.js application (cPanel will handle this automatically)

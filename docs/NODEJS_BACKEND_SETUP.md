@@ -1,52 +1,51 @@
-# Node.js + Express + MySQL Backend Setup Guide
+# ⚙️ BACKEND CORE: NODE.JS & MYSQL SETUP GUIDE
 
-This backend serves the HTU Accreditation Monitoring System with a MySQL database and Resend for email reminders.
-
-## Prerequisites
-
-- Node.js 18+
-- MySQL database (available on most cPanel hosting)
-- Resend API key for emails — get one at https://resend.com
+**HTU Accreditation Monitoring System**  
+**Ho Technical University | ICT Directorate**
 
 ---
 
-## Quick Start
-
-```bash
-mkdir htu-accreditation-api && cd htu-accreditation-api
-npm init -y
-npm install express cors mysql2 dotenv resend
-```
-
-Create `.env`:
-
-```env
-PORT=3001
-DB_HOST=localhost
-DB_USER=root
-DB_PASSWORD=your_password
-DB_NAME=htu_accreditation
-RESEND_API_KEY=re_xxxxxxxxxxxxxxxx
-FRONTEND_URL=https://your-frontend-url.com
-```
+## 📑 TABLE OF CONTENTS
+- [1.0 System Requirements](#10-system-requirements)
+- [2.0 Database Schema Initialization](#20-database-schema-initialization)
+- [3.0 API Interface Implementation](#30-api-interface-implementation)
+- [4.0 Email Gateway Configuration](#40-email-gateway-configuration)
+- [5.0 Production Deployment (cPanel)](#50-production-deployment-cpanel)
 
 ---
 
-## Database Schema (MySQL)
+## 1.0 SYSTEM REQUIREMENTS
 
-Run this in your MySQL database (via cPanel → phpMyAdmin):
+The backend serves as the centralized logic hub for the HTU Accreditation Monitoring System.
+
+| Component | specification |
+|---|---|
+| **Runtime** | Node.js 18.x or 20.x (LTS) |
+| **Framework** | Express.js (RESTful) |
+| **Database** | MySQL 8.0+ / MariaDB 10.4+ |
+| **Email Gateway** | Resend API (Recommended) or Gmail OAuth |
+
+---
+
+## 2.0 DATABASE SCHEMA INITIALIZATION
+
+The system utilizes a relational schema with UUID-based identification. Use **phpMyAdmin** or a MySQL terminal to initialize the database:
 
 ```sql
 CREATE DATABASE IF NOT EXISTS htu_accreditation;
 USE htu_accreditation;
 
+-- Core Accreditations Table
 CREATE TABLE accreditations (
-  id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
+  id VARCHAR(36) PRIMARY KEY,
   programme_name VARCHAR(255) NOT NULL,
-  start_date DATE NULL,
+  accreditation_type ENUM('programme', 'institutional') DEFAULT 'programme',
+  faculty VARCHAR(255),
+  department VARCHAR(255),
+  start_date DATE,
   expiry_date DATE NOT NULL,
-  email VARCHAR(255) NULL,
-  notes TEXT NULL,
+  email VARCHAR(255),
+  workflow_status VARCHAR(100),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
@@ -54,210 +53,56 @@ CREATE TABLE accreditations (
 
 ---
 
-## API Endpoints
+## 3.0 API INTERFACE IMPLEMENTATION
 
-All endpoints are under `{BASE_URL}/api/...`
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/accreditations` | List all accreditations |
-| GET | `/api/accreditations/:id` | Get single accreditation |
-| POST | `/api/accreditations` | Create accreditation |
-| DELETE | `/api/accreditations/:id` | Delete accreditation |
-| GET | `/api/metrics` | Dashboard metrics |
-| POST | `/api/send-reminder/:id` | Send single reminder |
-| POST | `/api/send-bulk-reminders` | Send bulk reminders |
-| GET | `/api/health` | Health check |
-
-### Response Format
-
-Accreditations are returned in **camelCase**:
-```json
-{
-  "id": "uuid",
-  "programmeName": "BSc Computer Science",
-  "startDate": "2021-09-01",
-  "expiryDate": "2025-08-31",
-  "email": "cs.dept@htu.edu.gh",
-  "daysUntilExpiry": 120,
-  "status": "critical"
-}
+### 3.1 Environment Configuration (`.env`)
+```env
+PORT=3001
+DB_HOST=localhost
+DB_USER=htu_db_admin
+DB_PASSWORD=YOUR_SECURE_PHRASE
+DB_NAME=htu_accreditation
+RESEND_API_KEY=re_xxxxxxxxxxxxxxxx
+FRONTEND_URL=https://accreditation.htu.edu.gh
 ```
 
-### POST `/api/accreditations` body (snake_case):
-```json
-{
-  "programme_name": "BSc Computer Science",
-  "start_date": "2021-09-01",
-  "expiry_date": "2025-08-31",
-  "email": "cs.dept@htu.edu.gh"
+### 3.2 Core Logic Snippet (Status Calculation)
+```javascript
+function calculateComplianceStatus(expiryDate) {
+  const days = Math.floor((new Date(expiryDate) - new Date()) / 86400000);
+  if (days <= 0) return 'expired';
+  if (days <= 90) return 'critical';
+  if (days <= 365) return 'warning';
+  if (days <= 455) return 'upcoming'; // 15 months
+  return 'active';
 }
-```
-
-### POST `/api/send-bulk-reminders` body:
-```json
-{ "status": "warning" | "critical" | "all" }
 ```
 
 ---
 
-## Complete Server Code (`server.js`)
+## 4.0 EMAIL GATEWAY CONFIGURATION
 
-```javascript
-const express = require('express');
-const cors = require('cors');
-const mysql = require('mysql2/promise');
-const { Resend } = require('resend');
-require('dotenv').config();
+The system uses **Resend** for institutional mail delivery. Ensure your domain `htu.edu.gh` is verified in the Resend dashboard to prevent the system emails from being flagged as spam.
 
-const app = express();
-const resend = new Resend(process.env.RESEND_API_KEY);
+> [!IMPORTANT]
+> **API Security**: Never commit your `RESEND_API_KEY` to public repositories. Always use the server-side `.env` file.
 
-app.use(cors({ origin: process.env.FRONTEND_URL || '*' }));
-app.use(express.json());
+---
 
-const pool = mysql.createPool({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-});
+## 5.0 PRODUCTION DEPLOYMENT (CPANEL)
 
-function getStatus(expiryDate) {
-  const days = Math.floor((new Date(expiryDate) - new Date()) / 86400000);
-  if (days <= 0) return { days, status: 'expired' };
-  if (days <= 180) return { days, status: 'critical' };
-  if (days <= 365) return { days, status: 'warning' };
-  return { days, status: 'active' };
-}
+1.  **Repository Setup**: Upload the `backend/` directory to your server.
+2.  **Node.js App**: In cPanel, navigate to **Setup Node.js App**.
+3.  **App Configuration**:
+    - **Startup File**: `app.js` (or `server.js`)
+    - **App Root**: `backend`
+4.  **Dependencies**: Click **Run NPM Install** to fetch `express`, `mysql2`, and `resend`.
+5.  **Restart**: Restart the application after any changes to the `.env` file.
 
-function transformRow(row) {
-  const { days, status } = getStatus(row.expiry_date);
-  return {
-    id: row.id,
-    programmeName: row.programme_name,
-    startDate: row.start_date ? new Date(row.start_date).toISOString().split('T')[0] : '',
-    expiryDate: new Date(row.expiry_date).toISOString().split('T')[0],
-    email: row.email || '',
-    daysUntilExpiry: days,
-    status,
-  };
-}
+---
 
-app.get('/api/accreditations', async (req, res) => {
-  try {
-    const [rows] = await pool.query('SELECT * FROM accreditations ORDER BY expiry_date ASC');
-    res.json(rows.map(transformRow));
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get('/api/accreditations/:id', async (req, res) => {
-  try {
-    const [rows] = await pool.query('SELECT * FROM accreditations WHERE id = ?', [req.params.id]);
-    if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
-    res.json(transformRow(rows[0]));
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/accreditations', async (req, res) => {
-  try {
-    const { programme_name, start_date, expiry_date, email } = req.body;
-    const id = crypto.randomUUID();
-    await pool.query(
-      'INSERT INTO accreditations (id, programme_name, start_date, expiry_date, email) VALUES (?, ?, ?, ?, ?)',
-      [id, programme_name, start_date || null, expiry_date, email || null]
-    );
-    const [rows] = await pool.query('SELECT * FROM accreditations WHERE id = ?', [id]);
-    res.status(201).json(transformRow(rows[0]));
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.delete('/api/accreditations/:id', async (req, res) => {
-  try {
-    await pool.query('DELETE FROM accreditations WHERE id = ?', [req.params.id]);
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get('/api/metrics', async (req, res) => {
-  try {
-    const [rows] = await pool.query('SELECT * FROM accreditations');
-    const metrics = { total: rows.length, active: 0, warning: 0, critical: 0, expired: 0 };
-    rows.forEach(row => { metrics[getStatus(row.expiry_date).status]++; });
-    res.json(metrics);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/send-reminder/:id', async (req, res) => {
-  try {
-    const [rows] = await pool.query('SELECT * FROM accreditations WHERE id = ?', [req.params.id]);
-    if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
-    const acc = rows[0];
-    if (!acc.email) return res.status(400).json({ error: 'No email address' });
-    const { days } = getStatus(acc.expiry_date);
-    const result = await resend.emails.send({
-      from: 'HTU QA Unit <noreply@yourdomain.com>',
-      to: [acc.email],
-      subject: `Accreditation Reminder: ${acc.programme_name}`,
-      html: `<p>The accreditation for <strong>${acc.programme_name}</strong> expires in ${days} days.</p>`,
-    });
-    res.json({ success: true, messageId: result.id });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/send-bulk-reminders', async (req, res) => {
-  try {
-    const { status: filterStatus } = req.body;
-    const [rows] = await pool.query('SELECT * FROM accreditations WHERE email IS NOT NULL');
-    const results = [];
-    for (const row of rows) {
-      const { days, status } = getStatus(row.expiry_date);
-      let shouldSend = false;
-      if (filterStatus === 'warning' && status === 'warning') shouldSend = true;
-      else if (filterStatus === 'critical' && (status === 'critical' || status === 'expired')) shouldSend = true;
-      else if (filterStatus === 'all' && status !== 'active') shouldSend = true;
-      if (!shouldSend) continue;
-      try {
-        await resend.emails.send({
-          from: 'HTU QA Unit <noreply@yourdomain.com>',
-          to: [row.email],
-          subject: `Accreditation Reminder: ${row.programme_name}`,
-          html: `<p>The accreditation for <strong>${row.programme_name}</strong> expires in ${days} days.</p>`,
-        });
-        results.push({ id: row.id, success: true });
-      } catch (err) {
-        results.push({ id: row.id, success: false, error: err.message });
-      }
-    }
-    res.json({ sent: results.filter(r => r.success).length, results });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get('/api/health', async (req, res) => {
-  try {
-    const [rows] = await pool.query('SELECT COUNT(*) as count FROM accreditations');
-    res.json({ status: 'ok', smtp: process.env.RESEND_API_KEY ? 'configured' : 'not configured', accreditations: rows[0].count });
-  } catch (err) {
-    res.status(500).json({ status: 'error', error: err.message });
-  }
-});
-
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+**Technical Lead: ICT Directorate, Ho Technical University**
+**© 2026 HTU Accreditation Monitoring Project**
 ```
 
 ---

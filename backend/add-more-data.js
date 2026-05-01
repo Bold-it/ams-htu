@@ -18,7 +18,7 @@ async function addDemoData() {
         // 1. Add New Users
         console.log('Adding new demo users...');
         const defaultPassword = await bcrypt.hash('password123', 10);
-        
+
         const newUsers = [
             // id, username, email, password_hash, role, status
             [crypto.randomUUID(), 'vc_admin', 'vc@htu.edu.gh', defaultPassword, 'admin', 'active'],
@@ -41,25 +41,25 @@ async function addDemoData() {
         const today = new Date();
         const moreAccs = [
             // programme_name, faculty, department, start_date, expiry_date, email
-            ['HND Accountancy', 'Business School', 'Accounting', 
-             new Date(today.getFullYear() - 5, today.getMonth(), today.getDate()).toISOString().split('T')[0],
-             new Date(today.getFullYear(), today.getMonth() - 1, today.getDate()).toISOString().split('T')[0], // Expired recently
-             'hod.acc@htu.edu.gh'],
-             
+            ['HND Accountancy', 'Business School', 'Accounting',
+                new Date(today.getFullYear() - 5, today.getMonth(), today.getDate()).toISOString().split('T')[0],
+                new Date(today.getFullYear(), today.getMonth() - 1, today.getDate()).toISOString().split('T')[0], // Expired recently
+                'hod.acc@htu.edu.gh'],
+
             ['HND Marketing', 'Business School', 'Marketing',
-             new Date(today.getFullYear() - 2, 5, 15).toISOString().split('T')[0],
-             new Date(today.getFullYear() + 3, 5, 15).toISOString().split('T')[0], // Healthy
-             'hod.mkt@htu.edu.gh'],
-             
+                new Date(today.getFullYear() - 2, 5, 15).toISOString().split('T')[0],
+                new Date(today.getFullYear() + 3, 5, 15).toISOString().split('T')[0], // Healthy
+                'hod.mkt@htu.edu.gh'],
+
             ['BTech Cybersecurity', 'Applied Sciences', 'Computer Science',
-             new Date(today.getFullYear(), today.getMonth() - 2, 10).toISOString().split('T')[0],
-             new Date(today.getFullYear() + 5, today.getMonth() - 2, 10).toISOString().split('T')[0], // Very new
-             'hod.cs@htu.edu.gh'],
-             
+                new Date(today.getFullYear(), today.getMonth() - 2, 10).toISOString().split('T')[0],
+                new Date(today.getFullYear() + 5, today.getMonth() - 2, 10).toISOString().split('T')[0], // Very new
+                'hod.cs@htu.edu.gh'],
+
             ['MTech Agric Engineering', 'Engineering', 'Agricultural Eng.',
-             new Date(today.getFullYear() - 3, 8, 1).toISOString().split('T')[0],
-             new Date(today.getFullYear(), today.getMonth() + 2, 1).toISOString().split('T')[0], // Critical (expires in 2 months)
-             'agric@htu.edu.gh']
+                new Date(today.getFullYear() - 3, 8, 1).toISOString().split('T')[0],
+                new Date(today.getFullYear(), today.getMonth() + 2, 1).toISOString().split('T')[0], // Critical (expires in 2 months)
+                'agric@htu.edu.gh']
         ];
 
         for (const [name, fac, dept, start, expiry, email] of moreAccs) {
@@ -80,7 +80,7 @@ async function addDemoData() {
         ];
 
         for (const log of auditLogs) {
-             await connection.query(
+            await connection.query(
                 // Use a slightly varied timestamp for realism
                 'INSERT INTO audit_logs (id, action, user_email, method, path, details, ip_address, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, DATE_SUB(NOW(), INTERVAL ? HOUR))',
                 [log[0], log[1], log[2], log[3], log[4], log[5], log[6], Math.floor(Math.random() * 48)]
@@ -90,7 +90,7 @@ async function addDemoData() {
 
 
         console.log('\n✅ NEW DATA ADDED SUCCESSFULLY!');
-        
+
     } catch (err) {
         console.error('❌ Error adding demo data:', err);
     } finally {

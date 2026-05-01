@@ -6,7 +6,9 @@ interface MetricCardProps {
   value: number;
   subtitle?: string;
   icon: LucideIcon;
-  variant?: "default" | "active" | "warning" | "critical" | "expired";
+  variant?: "default" | "active" | "upcoming" | "warning" | "critical" | "expired";
+  onClick?: () => void;
+  isSelected?: boolean;
 }
 
 export function MetricCard({
@@ -15,10 +17,13 @@ export function MetricCard({
   subtitle,
   icon: Icon,
   variant = "default",
+  onClick,
+  isSelected,
 }: MetricCardProps) {
   const variantClasses = {
     default: "metric-card",
     active: "metric-card metric-card-active",
+    upcoming: "metric-card bg-blue-50/50 border-blue-200",
     warning: "metric-card metric-card-warning",
     critical: "metric-card metric-card-critical",
     expired: "metric-card metric-card-expired",
@@ -26,33 +31,47 @@ export function MetricCard({
 
   const iconColors = {
     default: "text-primary",
-    active: "text-status-active",
-    warning: "text-status-warning",
-    critical: "text-status-critical",
-    expired: "text-status-expired",
+    active: "text-emerald-600",
+    upcoming: "text-blue-600",
+    warning: "text-amber-600",
+    critical: "text-red-600",
+    expired: "text-slate-600",
   };
 
   return (
-    <div className={cn(variantClasses[variant], "animate-fade-in")}>
-      <div className="flex items-start justify-between">
-        <div className="space-y-1">
-          <p className="text-sm font-medium text-muted-foreground">{title}</p>
-          <p className="text-3xl font-bold tracking-tight">{value}</p>
-          {subtitle && (
-            <p className="text-xs text-muted-foreground">{subtitle}</p>
-          )}
-        </div>
+    <div 
+      className={cn(
+        variantClasses[variant], 
+        "animate-fade-in cursor-pointer transition-all hover:shadow-md",
+        isSelected && "ring-2 ring-primary ring-offset-2"
+      )}
+      onClick={onClick}
+    >
+      
+      <div className="flex flex-col gap-4">
         <div
           className={cn(
-            "rounded-lg p-2.5",
+            "w-max rounded-2xl p-3 shadow-inner",
             variant === "default" && "bg-primary/10",
-            variant === "active" && "bg-status-active/10",
-            variant === "warning" && "bg-status-warning/10",
-            variant === "critical" && "bg-status-critical/10",
-            variant === "expired" && "bg-status-expired/10"
+            variant === "active" && "bg-emerald-500/10",
+            variant === "upcoming" && "bg-blue-500/10",
+            variant === "warning" && "bg-amber-500/10",
+            variant === "critical" && "bg-red-500/10",
+            variant === "expired" && "bg-slate-500/10"
           )}
         >
-          <Icon className={cn("h-5 w-5", iconColors[variant])} />
+          <Icon className={cn("h-6 w-6", iconColors[variant])} />
+        </div>
+        
+        <div className="space-y-0.5">
+          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">{title}</p>
+          <p className={cn(
+            "text-3xl font-black tracking-tighter",
+            variant === "default" ? "text-slate-900" : iconColors[variant]
+          )}>{value}</p>
+          {subtitle && (
+            <p className="text-[10px] font-medium text-slate-400 italic">{subtitle}</p>
+          )}
         </div>
       </div>
     </div>

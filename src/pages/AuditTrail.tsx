@@ -25,6 +25,9 @@ import { format } from "date-fns";
 import { Header } from "@/components/Header";
 import { useAuth } from "@/components/AuthContext";
 import { Navigate } from "react-router-dom";
+import { generateAuditLogExport } from "@/lib/ReportGenerator";
+import { Button } from "@/components/ui/button";
+import { FileDown } from "lucide-react";
 
 interface AuditLog {
     id: number;
@@ -35,6 +38,7 @@ interface AuditLog {
     details: string;
     ip_address: string;
     timestamp: string;
+    status?: number;
 }
 
 const AuditTrail = () => {
@@ -94,6 +98,61 @@ const AuditTrail = () => {
         setExpandedRows(newExpanded);
     };
 
+    const getFriendlyAction = (log: AuditLog) => {
+        let details: Record<string, any> = {}; // eslint-disable-line @typescript-eslint/no-explicit-any
+        try {
+            details = JSON.parse(log.details) as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+        } catch (e) {
+            details = {};
+        }
+
+        const body = (details.body || {}) as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+        const params = (details.params || {}) as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+        const query = (details.query || {}) as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+        const resourceName = (details.resourceName as string) || '';
+        const user = log.user_email === 'anonymous' ? 'A guest or system process' : `The user (${log.user_email})`;
+        const statusMsg = log.status && log.status >= 400 ? ' (failed)' : '';
+
+        if (log.action === 'User Login') return `${user} successfully logged into the system.`;
+        if (log.action === 'Excel Upload') return `${user} uploaded multiple programme records via Excel.`;
+        
+        if (log.action === 'Create Accreditation') {
+            return `${user} registered a new programme: "${resourceName || (body.programme_name as string) || 'Unknown'}"${statusMsg}.`;
+        }
+        if (log.action === 'Update Accreditation') {
+            return `${user} updated the record for "${resourceName || (body.programme_name as string) || 'a programme'}"${statusMsg}.`;
+        }
+        if (log.action === 'Delete Accreditation') {
+            return `${user} permanently deleted the programme: "${resourceName || 'Unknown registration'}"${statusMsg}.`;
+        }
+        
+        if (log.action === 'View Accreditations') return `${user} viewed the accreditation dashboard.`;
+        if (log.action === 'Admin Reset Triggered') return `Administrators triggered a password reset for ${resourceName || 'a user'}${statusMsg}.`;
+        
+        if (log.action === 'Create User Account') {
+            return `${user} created a new user account for "${resourceName || (body.username as string) || 'unknown'}"${statusMsg}.`;
+        }
+        if (log.action === 'Delete User Account') {
+            return `${user} deleted the user account: "${resourceName || 'Unknown'}"${statusMsg}.`;
+        }
+        
+        if (log.action === 'Upload Document') {
+            return `${user} uploaded a ${resourceName || (body.document_type as string) || 'document'} to the vault${statusMsg}.`;
+        }
+        if (log.action === 'View Documents') return `${user} checked the document vault for a programme.`;
+        if (log.action === 'Delete Document') {
+            return `${user} removed the file "${resourceName || 'Unknown'}" from the system${statusMsg}.`;
+        }
+
+        // Checkpoints
+        if (log.path.includes('/checkpoints') && log.method === 'PUT') {
+            const status = (body.isCompleted as boolean) ? 'marked a task as completed' : 'reopened a task';
+            return `${user} ${status} for "${resourceName || 'a programme'}"${statusMsg}.`;
+        }
+
+        return `${user} performed action: ${log.action}${statusMsg}.`;
+    };
+
     if (role !== 'super_admin') {
         return <Navigate to="/" replace />;
     }
@@ -114,14 +173,24 @@ const AuditTrail = () => {
                         </p>
                     </div>
 
-                    <div className="relative w-full md:w-96">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                        <Input
-                            placeholder="Search by email, action, or path..."
-                            className="pl-10 h-10 shadow-sm"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                        />
+                    <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
+                        <div className="relative w-full md:w-80">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                            <Input
+                                placeholder="Search logs..."
+                                className="pl-10 h-10 shadow-sm"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                        </div>
+                        <Button 
+                            variant="default"
+                            className="w-full md:w-auto gap-2 bg-slate-800 hover:bg-slate-900 shadow-md"
+                            onClick={() => generateAuditLogExport(filteredLogs)}
+                        >
+                            <FileDown className="h-4 w-4" />
+                            <span>Export History</span>
+                        </Button>
                     </div>
                 </div>
 
@@ -209,10 +278,8 @@ const AuditTrail = () => {
                                 <TableHeader className="bg-slate-50/50">
                                     <TableRow>
                                         <TableHead className="w-[30px]"></TableHead>
-                                        <TableHead className="font-semibold">User</TableHead>
-                                        <TableHead className="font-semibold">Action</TableHead>
-                                        <TableHead className="font-semibold">Method/Path</TableHead>
-                                        <TableHead className="font-semibold text-right">Timestamp</TableHead>
+                                        <TableHead className="font-semibold">Human-Readable Activity Log</TableHead>
+                                        <TableHead className="font-semibold text-right">Date & Time</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -244,25 +311,18 @@ const AuditTrail = () => {
                                                         )}
                                                     </TableCell>
                                                     <TableCell>
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                                                <User className="h-4 w-4 text-primary" />
+                                                        <div className="flex flex-col gap-1 py-1">
+                                                            <span className={`text-sm font-medium leading-relaxed ${log.status && log.status >= 400 ? 'text-red-600' : 'text-slate-700'}`}>
+                                                                {getFriendlyAction(log)}
+                                                            </span>
+                                                            <div className="flex items-center gap-2">
+                                                                <Badge variant="outline" className={`text-[10px] py-0 px-1 font-normal ${log.status && log.status >= 400 ? 'text-red-400 border-red-200 bg-red-50' : 'text-slate-400'}`}>
+                                                                    {log.ip_address} {log.status && `• HTTP ${log.status}`}
+                                                                </Badge>
+                                                                {log.action.includes('Delete') && (
+                                                                    <Badge variant="destructive" className="text-[10px] py-0 px-1">Critical Action</Badge>
+                                                                )}
                                                             </div>
-                                                            <span className="font-medium text-slate-700">{log.user_email}</span>
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Badge
-                                                            variant={log.action.includes('Delete') ? 'destructive' : log.action.includes('Update') || log.action.includes('Upload') ? 'default' : 'secondary'}
-                                                            className="font-medium"
-                                                        >
-                                                            {log.action}
-                                                        </Badge>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <div className="flex flex-col">
-                                                            <span className="text-xs font-mono text-slate-400">{log.method}</span>
-                                                            <span className="text-sm text-slate-600 truncate max-w-[200px]">{log.path}</span>
                                                         </div>
                                                     </TableCell>
                                                     <TableCell className="text-right">

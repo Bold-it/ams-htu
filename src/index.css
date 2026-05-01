@@ -57,6 +57,10 @@
     --status-expired-bg: 0 0% 95%;
     --status-expired-border: 0 0% 70%;
 
+    --status-upcoming: 226 70% 50%;
+    --status-upcoming-bg: 226 100% 97%;
+    --status-upcoming-border: 226 60% 75%;
+
     /* Chart colors */
     --chart-active: 152 60% 42%;
     --chart-warning: 38 92% 50%;
@@ -84,6 +88,17 @@
     --sidebar-accent-foreground: 210 20% 95%;
     --sidebar-border: 210 80% 35%;
     --sidebar-ring: 0 85% 55%;
+
+    /* Premium Design Tokens */
+    --glass-background: 0 0% 100% / 0.7;
+    --glass-border: 0 0% 100% / 0.2;
+    --mesh-color-1: 210 100% 35%; /* HTU Blue */
+    --mesh-color-2: 0 85% 45%;    /* HTU Red */
+    --mesh-color-3: 200 60% 50%;   /* Light Blue */
+    --mesh-color-4: 0 0% 100%;     /* White */
+
+    --shadow-premium: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+    --shadow-inner-glow: inset 0 1px 1px 0 hsl(0 0% 100% / 0.2);
   }
 
   .dark {
@@ -130,6 +145,10 @@
     --status-expired: 0 0% 55%;
     --status-expired-bg: 0 0% 15%;
     --status-expired-border: 0 0% 35%;
+
+    --status-upcoming: 226 70% 65%;
+    --status-upcoming-bg: 226 30% 15%;
+    --status-upcoming-border: 226 40% 25%;
 
     --chart-active: 152 55% 50%;
     --chart-warning: 38 85% 55%;
@@ -272,6 +291,90 @@
   /* Header gradient */
   .header-gradient {
     background: var(--gradient-header);
+  }
+
+  /* Redesign Utilities */
+  .glass-card {
+    @apply backdrop-blur-md bg-white/70 border border-white/20;
+    box-shadow: var(--shadow-premium);
+  }
+
+  .glass-card-dark {
+    @apply backdrop-blur-md bg-slate-900/60 border border-slate-700/30;
+    box-shadow: var(--shadow-premium);
+  }
+
+  .mesh-gradient {
+    background-color: hsla(210, 100%, 35%, 1);
+    background-image:
+      radial-gradient(at 0% 0%, hsla(210, 100%, 35%, 1) 0px, transparent 50%),
+      radial-gradient(at 50% 0%, hsla(0, 85%, 45%, 1) 0px, transparent 50%),
+      radial-gradient(at 100% 0%, hsla(200, 60%, 50%, 1) 0px, transparent 50%),
+      radial-gradient(at 0% 100%, hsla(0, 85%, 45%, 1) 0px, transparent 50%),
+      radial-gradient(at 50% 100%, hsla(210, 100%, 35%, 1) 0px, transparent 50%),
+      radial-gradient(at 100% 100%, hsla(200, 60%, 50%, 1) 0px, transparent 50%);
+  }
+
+  .htu-curve-bg {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .htu-curve-bg::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 60%;
+    height: 100%;
+    background: linear-gradient(135deg, hsl(var(--mesh-color-2)), hsl(var(--mesh-color-2)) 100%);
+    clip-path: ellipse(80% 100% at 100% 50%);
+    z-index: -1;
+  }
+
+  .hero-text-glow {
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  }
+
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  @keyframes float {
+    0% { transform: translateY(0px); }
+    50% { transform: translateY(-20px); }
+    100% { transform: translateY(0px); }
+  }
+
+  .animate-stagger-fade-in > * {
+    opacity: 0;
+    animation: fadeIn 0.5s ease-out forwards;
+  }
+
+  .animate-stagger-fade-in > *:nth-child(1) { animation-delay: 0.1s; }
+  .animate-stagger-fade-in > *:nth-child(2) { animation-delay: 0.2s; }
+  .animate-stagger-fade-in > *:nth-child(3) { animation-delay: 0.3s; }
+  .animate-stagger-fade-in > *:nth-child(4) { animation-delay: 0.4s; }
+  .animate-stagger-fade-in > *:nth-child(5) { animation-delay: 0.5s; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .animate-bounce-slow {
+    animation: bounceSlow 3s infinite;
+  }
+
+  @keyframes bounceSlow {
+    0%, 100% {
+      transform: translateY(-5%) scale(1.25);
+      animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
+    }
+    50% {
+      transform: translateY(0) scale(1.25);
+      animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+    }
   }
 }
 
