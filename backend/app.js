@@ -96,8 +96,28 @@ let lastServerError = "No errors recorded yet.";
 
 app.get('/api/debug', (req, res) => {
     res.setHeader('Content-Type', 'text/plain');
-    res.send(`Last Server Error:\n\n${lastServerError}\n\nEnv Check:\nDB_HOST: ${process.env.DB_HOST}\nDB_NAME: ${process.env.DB_NAME}\nGOOGLE_CLIENT_ID: ${process.env.GOOGLE_CLIENT_ID ? 'LOADED' : 'MISSING'}`);
+    const distPath = path.join(__dirname, 'dist');
+    const distExists = fs.existsSync(distPath);
+    const indexExists = fs.existsSync(path.join(distPath, 'index.html'));
+    
+    res.send(`--- HTU DIAGNOSTIC PAGE ---
+Time: ${new Date().toISOString()}
+__dirname: ${__dirname}
+dist path: ${distPath}
+dist folder exists: ${distExists}
+index.html exists: ${indexExists}
+
+Last Server Error:
+${lastServerError}
+
+Env Check:
+DB_HOST: ${process.env.DB_HOST}
+DB_NAME: ${process.env.DB_NAME}
+GOOGLE_CLIENT_ID: ${process.env.GOOGLE_CLIENT_ID ? 'LOADED' : 'MISSING'}
+PORT: ${process.env.PORT}
+NODE_VERSION: ${process.version}`);
 });
+
 
 
 // AUTH MIDDLEWARE (JWT)
