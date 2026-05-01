@@ -706,17 +706,21 @@ app.post('/api/reset-password', async (req, res) => {
     }
 });
 
+// Global variable for debugging
+let lastServerError = "No errors recorded yet.";
+
+app.get('/api/debug', (req, res) => {
+    res.setHeader('Content-Type', 'text/plain');
+    res.send(`Last Server Error:\n\n${lastServerError}\n\nEnv Check:\nDB_HOST: ${process.env.DB_HOST}\nDB_NAME: ${process.env.DB_NAME}\nGOOGLE_CLIENT_ID: ${process.env.GOOGLE_CLIENT_ID ? 'LOADED' : 'MISSING'}`);
+});
+
 app.post('/api/google-login', async (req, res) => {
-    console.log('--- Google Login Attempt ---');
     try {
         const { credential } = req.body;
         if (!credential) {
-            console.log('Error: Missing credential in request body');
             return res.status(400).json({ error: 'Google credential is required' });
         }
 
-        console.log('Verifying token with Google Client ID:', (process.env.GOOGLE_CLIENT_ID || 'MISSING').substring(0, 10) + '...');
-        
         const ticket = await client.verifyIdToken({
             idToken: credential,
             audience: (process.env.GOOGLE_CLIENT_ID || '').trim(),
@@ -724,22 +728,16 @@ app.post('/api/google-login', async (req, res) => {
 
         const payload = ticket.getPayload();
         const { email, sub: googleId, name } = payload;
-        console.log('Verified email:', email);
 
         // Restriction: Only allow @htu.edu.gh domain
         if (!email.endsWith('@htu.edu.gh')) {
-            console.log('Error: Domain restriction failed for', email);
             return res.status(403).json({ error: 'Only @htu.edu.gh email addresses are allowed.' });
         }
 
-        // Check if user exists
-        console.log('Checking database for user...');
         let [rows] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
         let user;
 
         if (rows.length === 0) {
-            console.log('User not found. Creating new account...');
-            // New user - create with pending_approval status
             const userId = (crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex'));
             user = {
                 id: userId,
@@ -754,50 +752,49 @@ app.post('/api/google-login', async (req, res) => {
                 'INSERT INTO users (id, username, email, role, google_id, status) VALUES (?, ?, ?, ?, ?, ?)',
                 [user.id, user.username, user.email, user.role, user.google_id, user.status]
             );
-            console.log('New account created:', user.id);
 
             return res.json({
                 status: 'pending_approval',
                 message: 'Your account has been created and is pending approval by the Super Admin.'
             });
-        } else {
-            user = rows[0];
+        }
+        
+        user = rows[0];
 
-            // Link Google ID if not already linked
-            if (!user.google_id) {
-                await pool.query('UPDATE users SET google_id = ? WHERE id = ?', [googleId, user.id]);
-            }
+        // Link Google ID if not already linked
+        if (!user.google_id) {
+            await pool.query('UPDATE users SET google_id = ? WHERE id = ?', [googleId, user.id]);
+        }
 
-            if (user.status === 'pending_approval') {
-                return res.status(403).json({
-                    status: 'pending_approval',
-                    error: 'Your account is pending approval by the Super Admin.'
-                });
-            }
-
-            // Generate JWT (matching regular login logic)
-            const token = jwt.sign(
-                { id: user.id, email: user.email, role: user.role, department: user.department, faculty: user.faculty },
-                JWT_SECRET,
-                { expiresIn: '8h' }
-            );
-
-            res.json({
-                role: user.role,
-                department: user.department,
-                faculty: user.faculty,
-                token: token,
-                email: user.email
+        if (user.status === 'pending_approval') {
+            return res.status(403).json({
+                status: 'pending_approval',
+                error: 'Your account is pending approval by the Super Admin.'
             });
         }
+
+        // Generate JWT
+        const token = jwt.sign(
+            { id: user.id, email: user.email, role: user.role, department: user.department, faculty: user.faculty },
+            JWT_SECRET,
+            { expiresIn: '8h' }
+        );
+
+        res.json({
+            token,
+            user: {
+                id: user.id,
+                username: user.username,
+                email: user.email,
+                role: user.role,
+                department: user.department,
+                faculty: user.faculty
+            }
+        });
     } catch (err) {
         console.error('Google login error:', err);
-        // Include full error message for easier debugging
-        res.status(500).json({
-            error: 'Authentication failed',
-            details: err.message,
-            stack: err.stack ? 'present' : 'none'
-        });
+        lastServerError = `GOOGLE_LOGIN_ERROR: ${err.stack || err.message}`;
+        res.status(500).json({ error: 'Authentication failed on server. Visit /api/debug for details.' });
     }
 });
 
