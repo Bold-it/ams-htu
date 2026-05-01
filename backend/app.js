@@ -91,6 +91,15 @@ app.use((req, res, next) => {
     next();
 });
 
+// Global variable for debugging
+let lastServerError = "No errors recorded yet.";
+
+app.get('/api/debug', (req, res) => {
+    res.setHeader('Content-Type', 'text/plain');
+    res.send(`Last Server Error:\n\n${lastServerError}\n\nEnv Check:\nDB_HOST: ${process.env.DB_HOST}\nDB_NAME: ${process.env.DB_NAME}\nGOOGLE_CLIENT_ID: ${process.env.GOOGLE_CLIENT_ID ? 'LOADED' : 'MISSING'}`);
+});
+
+
 // AUTH MIDDLEWARE (JWT)
 const authMiddleware = (req, res, next) => {
     const authHeader = req.headers['authorization'];
@@ -706,13 +715,7 @@ app.post('/api/reset-password', async (req, res) => {
     }
 });
 
-// Global variable for debugging
-let lastServerError = "No errors recorded yet.";
 
-app.get('/api/debug', (req, res) => {
-    res.setHeader('Content-Type', 'text/plain');
-    res.send(`Last Server Error:\n\n${lastServerError}\n\nEnv Check:\nDB_HOST: ${process.env.DB_HOST}\nDB_NAME: ${process.env.DB_NAME}\nGOOGLE_CLIENT_ID: ${process.env.GOOGLE_CLIENT_ID ? 'LOADED' : 'MISSING'}`);
-});
 
 app.post('/api/google-login', async (req, res) => {
     try {
@@ -2322,11 +2325,20 @@ app.use(express.static(path.join(__dirname, 'dist'), {
     }
 }));
 
-// Fallback for SPA Routing
-app.get('*', (req, res) => {
+// Fallback for SPA Routing - MOVED BELOW API ROUTES
+app.get('*', (req, res, next) => {
+    // If it's an API request that wasn't handled, don't send index.html
+    if (req.url.startsWith('/api/')) {
+        return next();
+    }
     res.setHeader('Cache-Control', 'no-cache');
-    res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+    res.sendFile(path.join(__dirname, 'dist', 'index.html'), (err) => {
+        if (err) {
+            res.status(404).send("Frontend build not found in backend/dist");
+        }
+    });
 });
+
 
 // Warm up the database pool on startup
 pool.getConnection()
