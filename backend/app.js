@@ -2400,7 +2400,12 @@ app.get('/api/health', async (req, res) => {
 const oneYear = 31536000000; // 1 year in ms
 
 // Serve static files with aggressive caching for assets
-app.use(express.static(path.join(__dirname, 'dist'), {
+// Try both local dist and parent dist to handle different cPanel deployment structures
+const distPath = fs.existsSync(path.join(__dirname, 'dist')) 
+    ? path.join(__dirname, 'dist') 
+    : path.join(__dirname, '..', 'dist');
+
+app.use(express.static(distPath, {
     maxAge: oneYear,
     setHeaders: (res, filePath) => {
         // Force COOP headers for Google Auth
@@ -2426,9 +2431,9 @@ app.get('*', (req, res, next) => {
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
     res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
-    res.sendFile(path.join(__dirname, 'dist', 'index.html'), (err) => {
+    res.sendFile(path.join(distPath, 'index.html'), (err) => {
         if (err) {
-            res.status(404).send("Frontend build not found in backend/dist");
+            res.status(404).send(`Frontend build not found at ${distPath}`);
         }
     });
 });

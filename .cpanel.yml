@@ -1,5 +1,5 @@
----
 deployment:
   tasks:
     - export DEPLOYPATH=/home/amshtuedu/repositories/ams-htu
     - /bin/cp -R * $DEPLOYPATH
+    - /bin/cp -R dist $DEPLOYPATH/backend/
