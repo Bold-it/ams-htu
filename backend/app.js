@@ -45,6 +45,16 @@ const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const JWT_SECRET = process.env.JWT_SECRET || 'htu_production_secret_2026';
 
+// --- AGGRESSIVE STATIC FILE SERVING PATHS ---
+const possibleDistPaths = [
+    path.join(__dirname, 'dist'),
+    path.join(__dirname, '..', 'dist'),
+    path.join('/home/amshtuedu/repositories/ams-htu/dist'),
+    path.join('/home/amshtuedu/repositories/ams-htu/backend/dist')
+];
+const finalDistPath = possibleDistPaths.find(p => fs.existsSync(path.join(p, 'index.html'))) || possibleDistPaths[0];
+console.log('[SYSTEM] Static assets path resolved to:', finalDistPath);
+
 // --- RATE LIMITERS ---
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
@@ -202,9 +212,10 @@ app.post(['/', '/login'], async (req, res, next) => {
             );
 
             // Inject script into index.html to set localStorage and redirect
-            const htmlPath = path.join(__dirname, 'dist', 'index.html');
+            const htmlPath = path.join(finalDistPath, 'index.html');
             if (!fs.existsSync(htmlPath)) {
-                return res.status(500).send("Frontend build not found. Please run npm run build.");
+                lastServerError = `Redirect Handler: index.html not found at ${htmlPath}`;
+                return res.status(500).send(`Frontend build not found. Tried: ${htmlPath}`);
             }
             
             let html = fs.readFileSync(htmlPath, 'utf8');
@@ -224,7 +235,8 @@ app.post(['/', '/login'], async (req, res, next) => {
 
         } catch (err) {
             console.error('Google Redirect Auth Error:', err);
-            return res.send(`<script>alert('Authentication failed: ${err.message}'); window.location.href = '/login';</script>`);
+            lastServerError = `Redirect Auth Error: ${err.message}`;
+            return res.status(500).send(`Authentication failed: ${err.message}. Check /debug for details.`);
         }
     }
     next();
