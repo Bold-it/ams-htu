@@ -137,9 +137,9 @@ const authMiddleware = (req, res, next) => {
 
 app.use(express.json());
 
-// Explicitly set COOP to unsafe-none to override any cPanel security defaults that block Google Login popups
+// Explicitly set COOP to same-origin-allow-popups to override any cPanel security defaults that block Google Login popups
 app.use((req, res, next) => {
-    res.setHeader('Cross-Origin-Opener-Policy', 'unsafe-none');
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
     res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
     next();
 });
