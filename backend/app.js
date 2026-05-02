@@ -2397,47 +2397,36 @@ app.get('/api/health', async (req, res) => {
 // --- FINAL PRODUCTION ROUTING ---
 
 // --- PERFORMANCE OPTIMIZED STATIC SERVING ---
-const oneYear = 31536000000; // 1 year in ms
+// --- AGGRESSIVE STATIC FILE SERVING (COOP BYPASS V2) ---
+const possibleDistPaths = [
+    path.join(__dirname, 'dist'),
+    path.join(__dirname, '..', 'dist'),
+    path.join('/home/amshtuedu/repositories/ams-htu/dist'),
+    path.join('/home/amshtuedu/repositories/ams-htu/backend/dist')
+];
 
-// Serve static files with aggressive caching for assets
-// Try both local dist and parent dist to handle different cPanel deployment structures
-const distPath = fs.existsSync(path.join(__dirname, 'dist')) 
-    ? path.join(__dirname, 'dist') 
-    : path.join(__dirname, '..', 'dist');
+let finalDistPath = possibleDistPaths.find(p => fs.existsSync(path.join(p, 'index.html'))) || possibleDistPaths[0];
+console.log('[SYSTEM] Serving frontend from:', finalDistPath);
 
-app.use(express.static(distPath, {
-    maxAge: oneYear,
+app.use(express.static(finalDistPath, {
+    maxAge: 31536000000,
     setHeaders: (res, filePath) => {
-        // Force COOP headers for Google Auth
         res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
         res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
-
-        // Only cache actual assets (JS, CSS, Images)
-        // Do NOT cache index.html so updates are seen immediately
-        if (filePath.endsWith('.html')) {
-            res.setHeader('Cache-Control', 'no-cache');
-        } else {
-            res.setHeader('Cache-Control', `public, max-age=${oneYear / 1000}, immutable`);
-        }
+        res.setHeader('X-AMS-Deploy-Path', finalDistPath); // Debug header
+        if (filePath.endsWith('.html')) res.setHeader('Cache-Control', 'no-cache');
     }
 }));
 
-// Fallback for SPA Routing - MOVED BELOW API ROUTES
 app.get('*', (req, res, next) => {
-    // If it's an API request that wasn't handled, don't send index.html
-    if (req.url.startsWith('/api/')) {
-        return next();
-    }
+    if (req.url.startsWith('/api/')) return next();
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
     res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
-    res.sendFile(path.join(distPath, 'index.html'), (err) => {
-        if (err) {
-            res.status(404).send(`Frontend build not found at ${distPath}`);
-        }
+    res.sendFile(path.join(finalDistPath, 'index.html'), (err) => {
+        if (err) res.status(404).send(`Frontend build not found. Tried paths: ${possibleDistPaths.join(', ')}`);
     });
 });
-
 
 // Warm up the database pool on startup
 pool.getConnection()
