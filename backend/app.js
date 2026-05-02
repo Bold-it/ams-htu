@@ -2317,6 +2317,10 @@ const oneYear = 31536000000; // 1 year in ms
 app.use(express.static(path.join(__dirname, 'dist'), {
     maxAge: oneYear,
     setHeaders: (res, filePath) => {
+        // Force COOP headers for Google Auth
+        res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+        res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
+
         // Only cache actual assets (JS, CSS, Images)
         // Do NOT cache index.html so updates are seen immediately
         if (filePath.endsWith('.html')) {
@@ -2334,6 +2338,8 @@ app.get('*', (req, res, next) => {
         return next();
     }
     res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+    res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
     res.sendFile(path.join(__dirname, 'dist', 'index.html'), (err) => {
         if (err) {
             res.status(404).send("Frontend build not found in backend/dist");

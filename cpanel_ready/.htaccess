@@ -1,0 +1,10 @@
+RewriteEngine On
+
+# DO NOT redirect /api requests (allow Application Manager to handle them)
+RewriteCond %{REQUEST_URI} ^/api [NC]
+RewriteRule .* - [L]
+
+# Normal React routing
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.html [L]

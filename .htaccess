@@ -8,7 +8,9 @@ RedirectMatch 404 /\.git
 </IfModule>
 
 <IfModule mod_headers.c>
+    Header always unset Cross-Origin-Opener-Policy
     Header always set Cross-Origin-Opener-Policy "same-origin-allow-popups"
+    Header always unset Cross-Origin-Embedder-Policy
     Header always set Cross-Origin-Embedder-Policy "unsafe-none"
 </IfModule>
 
