@@ -146,12 +146,7 @@ const authMiddleware = (req, res, next) => {
 
 app.use(express.json());
 
-// Security headers for Google Auth / COOP
-app.use((req, res, next) => {
-    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
-    // REMOVED 'require-corp' as it blocks Google Sign-In communication
-    next();
-});
+// Removed Security headers for Google Auth / COOP to fix popup blocking
 
 // Multer Configuration
 const storage = multer.diskStorage({
