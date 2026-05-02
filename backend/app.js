@@ -96,15 +96,6 @@ app.use((req, res, next) => {
     if (req.headers['x-user-email']) {
         req.headers['x-user-email'] = req.headers['x-user-email'].trim().toLowerCase();
     }
-
-    // 2. Routing correction
-    const isApiRequest = !req.url.includes('.') &&
-        !req.url.startsWith('/api') &&
-        req.url !== '/';
-
-    if (isApiRequest) {
-        req.url = '/api' + (req.url.startsWith('/') ? '' : '/') + req.url;
-    }
     next();
 });
 
