@@ -130,6 +130,8 @@ const Login = () => {
                                     <GoogleLogin
                                         onSuccess={handleGoogleSuccess}
                                         onError={() => toast.error("Google Login Failed")}
+                                        ux_mode="redirect"
+                                        login_uri="https://ams.htu.edu.gh"
                                         content="signin_with"
                                         shape="pill"
                                         theme="filled_blue"

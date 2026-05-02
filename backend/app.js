@@ -136,11 +136,97 @@ const authMiddleware = (req, res, next) => {
 };
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Explicitly set COOP to same-origin-allow-popups to override any cPanel security defaults that block Google Login popups
 app.use((req, res, next) => {
     res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
     res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
+    next();
+});
+
+// --- GOOGLE REDIRECT MODE HANDLER (COOP BYPASS) ---
+app.post(['/', '/login'], async (req, res, next) => {
+    const { credential } = req.body;
+    if (credential) {
+        console.log('[AUTH] Received Google Redirect Credential for:', req.body.email || 'unknown');
+        try {
+            const ticket = await client.verifyIdToken({
+                idToken: credential,
+                audience: process.env.GOOGLE_CLIENT_ID,
+            });
+            const payload = ticket.getPayload();
+            const email = payload.email.toLowerCase();
+
+            if (!email.endsWith('@htu.edu.gh') && email !== 'accreditationsystem@htu.edu.gh') {
+                return res.send(`
+                    <script>
+                        alert('Unauthorized: Only @htu.edu.gh accounts are allowed.');
+                        window.location.href = '/login';
+                    </script>
+                `);
+            }
+
+            // Find or create user
+            const [rows] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
+            let user = rows[0];
+
+            if (!user) {
+                const id = crypto.randomUUID();
+                await pool.query(
+                    'INSERT INTO users (id, username, email, role, status) VALUES (?, ?, ?, ?, ?)',
+                    [id, payload.name || email.split('@')[0], email, 'user', 'pending_approval']
+                );
+                return res.send(`
+                    <script>
+                        alert('Account created. Waiting for admin approval.');
+                        window.location.href = '/login';
+                    </script>
+                `);
+            }
+
+            if (user.status === 'pending_approval') {
+                 return res.send(`
+                    <script>
+                        alert('Account is pending approval.');
+                        window.location.href = '/login';
+                    </script>
+                `);
+            }
+
+            // Generate JWT
+            const token = jwt.sign(
+                { id: user.id, email: user.email, role: user.role, department: user.department, faculty: user.faculty },
+                JWT_SECRET,
+                { expiresIn: '24h' }
+            );
+
+            // Inject script into index.html to set localStorage and redirect
+            const htmlPath = path.join(__dirname, 'dist', 'index.html');
+            if (!fs.existsSync(htmlPath)) {
+                return res.status(500).send("Frontend build not found. Please run npm run build.");
+            }
+            
+            let html = fs.readFileSync(htmlPath, 'utf8');
+            const script = `
+                <script>
+                    localStorage.setItem('auth_token', '${token}');
+                    localStorage.setItem('auth_role', '${user.role}');
+                    localStorage.setItem('auth_email', '${user.email}');
+                    ${user.department ? `localStorage.setItem('auth_dept', '${user.department}');` : ''}
+                    ${user.faculty ? `localStorage.setItem('auth_faculty', '${user.faculty}');` : ''}
+                    console.log('Auth success, redirecting to dashboard...');
+                    window.location.href = '/';
+                </script>
+            `;
+            html = html.replace('</head>', `${script}</head>`);
+            return res.send(html);
+
+        } catch (err) {
+            console.error('Google Redirect Auth Error:', err);
+            return res.send(`<script>alert('Authentication failed: ${err.message}'); window.location.href = '/login';</script>`);
+        }
+    }
     next();
 });
 
