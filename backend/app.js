@@ -146,7 +146,12 @@ const authMiddleware = (req, res, next) => {
 
 app.use(express.json());
 
-// Removed Security headers for Google Auth / COOP to fix popup blocking
+// Explicitly set COOP to unsafe-none to override any cPanel security defaults that block Google Login popups
+app.use((req, res, next) => {
+    res.setHeader('Cross-Origin-Opener-Policy', 'unsafe-none');
+    res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
+    next();
+});
 
 // Multer Configuration
 const storage = multer.diskStorage({
