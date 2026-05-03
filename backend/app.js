@@ -73,15 +73,27 @@ const forgotPasswordLimiter = rateLimit({
 });
 
 
-const allowedOrigins = [process.env.FRONTEND_URL, 'https://ams.htu.edu.gh', 'http://localhost:8080'].filter(Boolean);
+const allowedOrigins = [
+    process.env.FRONTEND_URL, 
+    'https://ams.htu.edu.gh', 
+    'http://ams.htu.edu.gh',
+    'https://www.ams.htu.edu.gh',
+    'http://localhost:8080',
+    'http://localhost:5173'
+].filter(Boolean);
+
 app.use(cors({
     origin: (origin, callback) => {
-        if (!origin || allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+        // Allow requests with no origin (like mobile apps or curl)
+        // or if the origin is in our whitelist
+        if (!origin || allowedOrigins.some(o => origin.startsWith(o)) || allowedOrigins.includes('*')) {
             callback(null, true);
         } else {
+            console.error('[CORS] Blocked origin:', origin);
             callback(new Error('Not allowed by CORS'));
         }
-    }
+    },
+    credentials: true
 }));
 
 
