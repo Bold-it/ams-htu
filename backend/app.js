@@ -2409,17 +2409,6 @@ app.get('/api/health', async (req, res) => {
 // --- FINAL PRODUCTION ROUTING ---
 
 // --- PERFORMANCE OPTIMIZED STATIC SERVING ---
-// --- AGGRESSIVE STATIC FILE SERVING (COOP BYPASS V2) ---
-const possibleDistPaths = [
-    path.join(__dirname, 'dist'),
-    path.join(__dirname, '..', 'dist'),
-    path.join('/home/amshtuedu/repositories/ams-htu/dist'),
-    path.join('/home/amshtuedu/repositories/ams-htu/backend/dist')
-];
-
-let finalDistPath = possibleDistPaths.find(p => fs.existsSync(path.join(p, 'index.html'))) || possibleDistPaths[0];
-console.log('[SYSTEM] Serving frontend from:', finalDistPath);
-
 app.use(express.static(finalDistPath, {
     maxAge: 31536000000,
     setHeaders: (res, filePath) => {
