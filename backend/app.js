@@ -756,7 +756,7 @@ app.post('/api/forgot-password', forgotPasswordLimiter, async (req, res) => {
             [token, expiry, email]
         );
 
-        const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:8080'}/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
+        const resetLink = `${process.env.FRONTEND_URL || 'https://ams.htu.edu.gh'}/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
 
         try {
             await sendEmail(
@@ -936,7 +936,7 @@ app.post('/api/users/reset-password', authMiddleware, async (req, res) => {
             [token, expiry, userId]
         );
 
-        const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:8080'}/reset-password?token=${token}&email=${encodeURIComponent(targetEmail)}`;
+        const resetLink = `${process.env.FRONTEND_URL || 'https://ams.htu.edu.gh'}/reset-password?token=${token}&email=${encodeURIComponent(targetEmail)}`;
 
         // 4. Send reset email
         await sendEmail(
@@ -1015,10 +1015,10 @@ app.post('/api/users', authMiddleware, async (req, res) => {
                 <p>Your account has been successfully created by the Super Admin.</p>
                 <p><strong>Account Role:</strong> ${role === 'admin' ? 'Administrator' : 'Viewer'}</p>
                 <p>You can now log in to the portal using your credentials.</p>
-                <p><a href="${process.env.FRONTEND_URL || 'http://localhost:8080'}/login" style="display: inline-block; padding: 10px 20px; background-color: #0056b3; color: white; text-decoration: none; border-radius: 5px;">Login to Portal</a></p>
+                <p><a href="${process.env.FRONTEND_URL || 'https://ams.htu.edu.gh'}/login" style="display: inline-block; padding: 10px 20px; background-color: #0056b3; color: white; text-decoration: none; border-radius: 5px;">Login to Portal</a></p>
                 <p>Best regards,<br>The HTU Team</p>
                 `,
-                `Welcome to HTU. Hello ${username}, your account has been successfully created by the Super Admin with the role of ${role === 'admin' ? 'Administrator' : 'Viewer'}. You can now log in to the portal at ${process.env.FRONTEND_URL || 'http://localhost:8080'}/login.`
+                `Welcome to HTU. Hello ${username}, your account has been successfully created by the Super Admin with the role of ${role === 'admin' ? 'Administrator' : 'Viewer'}. You can now log in to the portal at ${process.env.FRONTEND_URL || 'https://ams.htu.edu.gh'}/login.`
             );
         } catch (emailErr) {
             console.error('Failed to send welcome email:', emailErr);
